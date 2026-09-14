@@ -96,6 +96,8 @@
   var params = new URLSearchParams(location.search);
   var LIFF_ID = params.get('liffId') || '';
   var API = params.get('api') || '';
+  var SAVED = 'jwic-quote-request:' + LIFF_ID;
+  var RELOGIN = 'jwic-quote-relogin:' + LIFF_ID;
   // Where an item with no category is filed - the same word the Form's catalogue uses.
   var OTHER = 'อื่นๆ';
   var data = null;
@@ -176,12 +178,61 @@
           return null;
         }
         return call('liffInit', { idToken: liff.getIDToken() }).then(function (res) {
+          if (res.code === 'auth' && onExpired()) return;
           if (res.error) return fail(errorText(res));
           data = res;
           render();
         });
       })
       .catch(function (err) { fail('เปิดหน้าไม่สำเร็จ กรุณาลองใหม่ (' + ((err && err.message) || err) + ')'); });
+  }
+
+  /**
+   * The endpoint refused the ID token. LINE's ID token lives one hour, and outside the LINE app the
+   * SDK keeps handing back the one it stored at login long after that - there is no refresh call - so
+   * the way out is a fresh login. The request being built is saved first and put back by restore():
+   * after the redirect here, or when the customer reopens the page inside the LINE app, where a new
+   * launch is the only way to a new token. Returns true when the page is redirecting away.
+   */
+  function onExpired() {
+    try {
+      if (state.basket.length) localStorage.setItem(SAVED, JSON.stringify({ at: Date.now(), state: state }));
+      if (liff.isInClient()) return false;
+      // Once a minute at most: a refusal straight after a fresh login is not an expiry, and looping
+      // through LINE's login page would hide whatever it really is.
+      if (Date.now() - Number(sessionStorage.getItem(RELOGIN) || 0) < 60000) return false;
+      sessionStorage.setItem(RELOGIN, String(Date.now()));
+    } catch (err) {
+      // Storage blocked (private mode): no guard against a loop, so no automatic login either.
+      return false;
+    }
+    liff.logout();
+    liff.login({ redirectUri: location.href });
+    return true;
+  }
+
+  /** A request onExpired() saved within the hour, put back where the customer left it. */
+  function restore() {
+    var saved;
+    try {
+      saved = JSON.parse(localStorage.getItem(SAVED) || 'null');
+      localStorage.removeItem(SAVED);
+    } catch (err) {
+      return false;
+    }
+    if (!saved || !(Date.now() - saved.at < 3600000)) return false;
+    Object.keys(state).forEach(function (k) {
+      if (k in saved.state) state[k] = saved.state[k];
+    });
+    // An item taken off the Catalogue in the meantime is not put back.
+    state.basket = state.basket.filter(function (l) { return byNo[l.no]; });
+    state.useBinding = !!(state.useBinding && data.binding);
+    Array.prototype.forEach.call($('form').elements, function (el) {
+      if (!el.name || !(el.name in state)) return;
+      if (el.type === 'radio') el.checked = el.value === state[el.name];
+      else el.value = state[el.name];
+    });
+    return state.basket.length > 0;
   }
 
   function render() {
@@ -201,11 +252,16 @@
     }
     bindShop();
     bindForm();
+    var resumed = restore();
     renderList();
     drawDocket();
     syncBuyer();
     $('loading').hidden = true;
     $('shop').hidden = false;
+    if (resumed) {
+      next();
+      toast('ข้อมูลที่กรอกไว้ยังอยู่ กด “ส่งคำขอราคา” อีกครั้ง', true);
+    }
   }
 
   function show(screen) {
@@ -532,6 +588,7 @@
     call('liffSubmit', buildSubmitBody(state, liff.getIDToken()))
       .then(function (res) {
         if (res.ok) return done(res.reference);
+        if (res.code === 'auth' && onExpired()) return;
         if (res.code === 'rebind') {
           state.useBinding = false;
           data.binding = null;
