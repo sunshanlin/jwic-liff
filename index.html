@@ -172,14 +172,23 @@
   .err:empty { display: none; }
   .choices { display: grid; gap: 8px; margin-top: 8px; }
   .choices.two { grid-template-columns: 1fr 1fr; }
+  /* Each answer has its own tint, so the options read as different things at a glance rather than one
+     white stack; the chosen one deepens and takes a border in its own colour. */
   .choice {
+    --tint: #F1F4F7; --tint-on: #E2E8EE; --edge: var(--rule); --mark: var(--ink);
     display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer;
     font-size: 15px; font-weight: 500; line-height: 1.35;
-    background: var(--card); border: 1px solid var(--rule); border-radius: 10px;
+    background: var(--tint); border: 1px solid var(--edge); border-radius: 10px;
   }
-  .choice input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
+  .choice:hover { border-color: var(--mark); }
+  .choice input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--mark); }
   .choice small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
-  .choice:has(input:checked) { background: #F5FAF6; border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .choice:has(input:checked) { background: var(--tint-on); border-color: var(--mark); box-shadow: inset 0 0 0 1px var(--mark); }
+  .t-blue { --tint: #EEF4FB; --tint-on: #DDEAF8; --edge: #C6D8EC; --mark: #1F5FA8; }
+  .t-violet { --tint: #F4F0FB; --tint-on: #E6DDF6; --edge: #D6CAEC; --mark: #5B3FA0; }
+  .t-green { --tint: #EEF7F1; --tint-on: #DCEFE2; --edge: #C3E0CC; --mark: #1D6F42; }
+  .t-slate { --tint: #F1F4F7; --tint-on: #E2E8EE; --edge: #CBD5DD; --mark: #16222C; }
+  .t-amber { --tint: #FCF6E8; --tint-on: #F7EACB; --edge: #EBD9A9; --mark: #8A6512; }
   .bound {
     display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px;
     padding: 12px 14px; background: #F5FAF6; border: 1px solid #BCDDC6; border-radius: 10px;
@@ -277,9 +286,9 @@
       <fieldset id="identityChoice">
         <legend>ท่านเป็น</legend>
         <div class="choices">
-          <label class="choice"><input type="radio" name="identity" value="returning"><span>ลูกค้าเดิม<small>เคยสั่งซื้อแล้ว</small></span></label>
-          <label class="choice"><input type="radio" name="identity" value="company"><span>ลูกค้าใหม่ ในนามนิติบุคคล</span></label>
-          <label class="choice"><input type="radio" name="identity" value="person"><span>ลูกค้าใหม่ ในนามบุคคลธรรมดา</span></label>
+          <label class="choice t-blue"><input type="radio" name="identity" value="returning"><span>ลูกค้าเดิม<small>เคยสั่งซื้อแล้ว</small></span></label>
+          <label class="choice t-violet"><input type="radio" name="identity" value="company"><span>ลูกค้าใหม่ ในนามนิติบุคคล</span></label>
+          <label class="choice t-green"><input type="radio" name="identity" value="person"><span>ลูกค้าใหม่ ในนามบุคคลธรรมดา</span></label>
         </div>
         <small class="err" data-err="identity"></small>
       </fieldset>
@@ -290,8 +299,8 @@
       <fieldset class="f" data-for="company">
         <legend>ประเภทสถานประกอบการ</legend>
         <div class="choices two">
-          <label class="choice"><input type="radio" name="branchType" value="HeadOffice" checked><span>สำนักงานใหญ่</span></label>
-          <label class="choice"><input type="radio" name="branchType" value="Branch"><span>สาขา</span></label>
+          <label class="choice t-slate"><input type="radio" name="branchType" value="HeadOffice" checked><span>สำนักงานใหญ่</span></label>
+          <label class="choice t-amber"><input type="radio" name="branchType" value="Branch"><span>สาขา</span></label>
         </div>
       </fieldset>
       <label class="f" data-for="person">ชื่อ-นามสกุล
