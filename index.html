@@ -115,7 +115,8 @@
   .zoom.has-desc .zoom-text { max-height: 35vh; }
   #zoomName { margin: 0; font-weight: 500; text-align: center; }
   #zoomDesc { margin: 10px 0 0; font-size: 14px; line-height: 1.65; color: rgba(255,255,255,.82); white-space: pre-line; }
-  .zoom small { font-size: 12px; color: rgba(255,255,255,.62); }
+  /* The hint sits at the popup's left edge, out from under the picture. */
+  .zoom small { width: 100%; max-width: 640px; font-size: 12px; text-align: left; color: rgba(255,255,255,.62); }
   body.zooming { overflow: hidden; }
   /* Delete sits apart from the stepper, so the tap that removes a line is never next to the one
      that changes it. */
@@ -272,6 +273,7 @@
     .zoom.has-desc img { flex: 0 0 58%; width: 58%; max-height: 80vh; }
     .zoom.has-desc .zoom-text { flex: 1; max-height: 80vh; }
     .zoom.has-desc #zoomName { font-size: 18px; text-align: left; }
+    .zoom.has-desc small { max-width: 1040px; }
     .items .act { margin-top: 0; }
     .items .stamp { justify-self: start; }
     h1 { font-size: 22px; }
