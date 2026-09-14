@@ -7,6 +7,9 @@
  * One page for every customer. The LIFF app's endpoint URL carries the only configuration:
  *   https://<pages host>/?liffId=<LIFF ID>&api=<URL-encoded Apps Script /exec URL>
  *
+ * Two screens: the Catalogue with its docket, then the buyer. That is the order the Form's own flow
+ * already taught (catalogue, ยืนยัน, form), and on a phone it gives the list the whole screen.
+ *
  * validate() and buildSubmitBody() touch no DOM. check-queue.cjs requires this file and feeds what
  * buildSubmitBody() makes straight into the library, so page and endpoint are tested as one
  * contract. validate() is only instant feedback - the endpoint checks every rule again and decides.
@@ -93,15 +96,38 @@
   var params = new URLSearchParams(location.search);
   var LIFF_ID = params.get('liffId') || '';
   var API = params.get('api') || '';
+  // Where an item with no category is filed - the same word the Form's catalogue uses.
+  var OTHER = 'อื่นๆ';
   var data = null;
+  var byNo = {};
   var state = {
     submissionId: newId(), basket: [], identity: '', useBinding: false,
     companyName: '', branchType: 'HeadOffice', personName: '', taxId: '', branchNo: '',
     address1: '', subDistrict: '', district: '', city: '', postCode: '',
     contactName: '', phone: '', email: '', deliveryDate: '', note: ''
   };
+  // Rows sit under their category heading unless a search is on; only a search result, which has no
+  // heading, repeats the category on the row.
+  var grouped = true;
+  var shopScroll = 0;
+  var sent = false;
+  var spyObserver = null;
+  var typing = 0;
+  var toastTimer = 0;
+
+  var SVG = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+  // A bin rather than a minus for delete: minus reads as "one fewer", which is the stepper's job.
+  var GLYPH = { inc: 'M9 4v10M4 9h10', dec: 'M4 9h10', del: 'M3.5 5.5h11M7.5 5.5V3.5h3v2M5.8 5.5l.7 8.5h5l.7-8.5' };
+  var LABEL = { inc: 'เพิ่มจำนวน ', dec: 'ลดจำนวน ', del: 'ลบออกจากตะกร้า ' };
 
   function $(id) { return document.getElementById(id); }
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
 
   function newId() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -129,11 +155,10 @@
 
   function fail(message) {
     $('loading').hidden = true;
-    $('fatal').textContent = message;
+    $('fatalText').textContent = message;
     $('fatal').hidden = false;
   }
 
-  var toastTimer = 0;
   function toast(message, long) {
     var el = $('toast');
     el.textContent = message;
@@ -160,10 +185,8 @@
   }
 
   function render() {
+    data.items.forEach(function (it) { byNo[it.no] = it; });
     $('notice').textContent = data.notice;
-    $('limit').textContent = data.lineLimit;
-    $('barLimit').textContent = data.lineLimit;
-    renderItems();
     data.provinces.forEach(function (p) {
       var o = document.createElement('option');
       o.value = p;
@@ -176,97 +199,273 @@
       $('boundName').textContent = (b.buyerName || 'เลขประจำตัวผู้เสียภาษี ' + b.taxIdMasked) +
         (b.branchNo ? ' สาขา ' + b.branchNo : '');
     }
+    bindShop();
     bindForm();
+    renderList();
+    drawDocket();
     syncBuyer();
-    renderBasket();
     $('loading').hidden = true;
-    $('form').hidden = false;
-    $('bar').hidden = false;
+    $('shop').hidden = false;
   }
 
-  function renderItems() {
-    var list = $('items');
-    data.items.forEach(function (it) {
-      var li = document.createElement('li');
-      li.dataset.search = [it.no, it.name, it.category, it.categoryName].join(' ').toLowerCase();
-      var info = document.createElement('div');
-      var name = document.createElement('div');
-      name.className = 'name';
-      name.textContent = it.name;
-      if (it.inStock) {
-        var badge = document.createElement('span');
-        badge.className = 'badge';
-        badge.textContent = 'พร้อมส่ง';
-        name.append(' ', badge);
-      }
-      var meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = it.no + ((it.categoryName || it.category) ? ' · ' + (it.categoryName || it.category) : '');
-      info.append(name, meta);
-      var qty = document.createElement('input');
-      qty.type = 'number';
-      qty.min = '1';
-      qty.value = '1';
-      qty.inputMode = 'decimal';
-      qty.setAttribute('aria-label', 'จำนวน ' + it.name);
-      var add = document.createElement('button');
-      add.type = 'button';
-      add.textContent = 'เพิ่ม';
-      add.addEventListener('click', function () { addLine(it, Number(qty.value)); });
-      li.append(info, qty, add);
-      list.append(li);
-    });
-    $('search').addEventListener('input', function () {
-      var q = this.value.trim().toLowerCase();
-      Array.prototype.forEach.call(list.children, function (li) {
-        li.hidden = q !== '' && li.dataset.search.indexOf(q) === -1;
-      });
-    });
+  function show(screen) {
+    $('shop').hidden = screen !== 'shop';
+    $('form').hidden = screen !== 'buyer';
+    $('done').hidden = screen !== 'done';
+    clearTimeout(toastTimer);
+    $('toast').hidden = true;
+    window.scrollTo(0, 0);
   }
 
-  function addLine(item, qty) {
-    if (!(qty > 0)) return toast('จำนวนต้องมากกว่า 0');
-    var line = state.basket.filter(function (l) { return l.no === item.no; })[0];
-    if (line) {
-      line.qty += qty;
-    } else if (state.basket.length >= data.lineLimit) {
-      return toast('เลือกได้ไม่เกิน ' + data.lineLimit + ' รายการ');
-    } else {
-      state.basket.push({ no: item.no, name: item.name, qty: qty });
+  // --- Screen 1: the Catalogue -----------------------------------------------------------------
+
+  function catOf(it) { return it.categoryName || it.category || OTHER; }
+
+  /** Categories alphabetically by the Thai alphabet, anything uncategorised last. */
+  function groups(rows) {
+    var by = {}, order = [];
+    rows.forEach(function (it) {
+      var c = catOf(it);
+      if (!by[c]) { by[c] = []; order.push(c); }
+      by[c].push(it);
+    });
+    order.sort(function (a, b) {
+      if (a === OTHER) return 1;
+      if (b === OTHER) return -1;
+      return a.localeCompare(b, 'th');
+    });
+    return order.map(function (c) { return { cat: c, items: by[c] }; });
+  }
+
+  function lineOf(code) {
+    for (var i = 0; i < state.basket.length; i++) {
+      if (state.basket[i].no === code) return state.basket[i];
     }
-    renderBasket();
-    toast('เพิ่ม ' + item.name + ' แล้ว');
+    return null;
   }
 
-  function renderBasket() {
-    var ul = $('basket');
-    ul.textContent = '';
-    state.basket.forEach(function (line, i) {
-      var li = document.createElement('li');
-      var name = document.createElement('span');
-      name.className = 'name';
-      name.textContent = line.name + ' (' + line.no + ')';
-      var qty = document.createElement('input');
-      qty.type = 'number';
-      qty.min = '1';
-      qty.value = line.qty;
-      qty.inputMode = 'decimal';
-      qty.setAttribute('aria-label', 'จำนวน ' + line.name);
-      qty.addEventListener('change', function () { line.qty = Number(qty.value); });
-      var remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'link';
-      remove.textContent = 'ลบ';
-      remove.addEventListener('click', function () { state.basket.splice(i, 1); renderBasket(); });
-      li.append(name, qty, remove);
-      ul.append(li);
+  /**
+   * One control. Minus, quantity, plus reads less-to-more; delete is its own button rather than
+   * "minus at 1", so a tap meant as "one fewer" never throws the line away. At 1 the minus is
+   * disabled rather than hidden, so nothing shifts sideways mid-tap.
+   */
+  function ctrl(kind, code, disabled) {
+    var label = esc(LABEL[kind] + code);
+    return '<button type="button" class="icon' + (kind === 'del' ? ' del on' : '') + '" data-act="' + kind + '"' +
+      (disabled ? ' disabled' : '') + ' aria-label="' + label + '" title="' + label + '">' +
+      SVG + '<path d="' + GLYPH[kind] + '"/></svg></button>';
+  }
+
+  /** The action cell: a lone + until the line is in the basket, the full set once it is. */
+  function controls(code, qty) {
+    var box = '<input class="qty" type="number" min="1" step="any" inputmode="decimal" placeholder="จำนวน" ' +
+      'aria-label="จำนวน ' + esc(code) + '" value="' + (qty === null ? '' : esc(String(qty))) + '">';
+    if (qty === null) return box + ctrl('inc', code, false);
+    return ctrl('dec', code, qty <= 1) + box + ctrl('inc', code, false) + ctrl('del', code, false);
+  }
+
+  function row(it) {
+    var line = lineOf(it.no);
+    var cls = [line ? 'picked' : '', it.inStock ? '' : 'dim'].filter(Boolean).join(' ');
+    var meta = (grouped ? [it.uom] : [catOf(it), it.uom]).filter(Boolean).join(' · ');
+    return '<li data-row="' + esc(it.no) + '"' + (cls ? ' class="' + cls + '"' : '') + '>' +
+      '<span class="code">' + esc(it.no) + '</span>' +
+      '<span class="name">' + esc(it.name) + '</span>' +
+      '<span class="meta">' + esc(meta) + '</span>' +
+      (it.inStock ? '<span class="stamp">In stock</span>' : '') +
+      '<span class="act">' + controls(it.no, line ? line.qty : null) + '</span></li>';
+  }
+
+  function renderList() {
+    var term = $('search').value.trim().toLowerCase();
+    var shown = !term ? data.items : data.items.filter(function (it) {
+      // Both spellings of a category are searchable: the name the customer reads, and the code
+      // sales reads off the quote while on the phone with them.
+      return [it.no, it.name, it.category, it.categoryName].join(' ').toLowerCase().indexOf(term) > -1;
     });
+    $('tally').textContent = (term ? shown.length + ' / ' : '') + data.items.length + ' รายการ';
+    $('empty').hidden = shown.length > 0;
+    grouped = !term;
+    var gs = groups(shown);
+    $('list').innerHTML = gs.map(function (g, i) {
+      return '<section class="group" id="sec' + i + '"><h2 class="cat">' + esc(g.cat) +
+        '<span>' + g.items.length + ' รายการ</span></h2>' +
+        '<ul class="items">' + g.items.map(row).join('') + '</ul></section>';
+    }).join('');
+    // The chips are a map of the whole Catalogue, so they only show while nothing is filtered.
+    var chips = $('chips');
+    chips.hidden = !!term;
+    chips.innerHTML = term ? '' : '<button type="button" data-sec="top" class="now">ทั้งหมด</button>' +
+      gs.map(function (g, i) { return '<button type="button" data-sec="' + i + '">' + esc(g.cat) + '</button>'; }).join('');
+    spy(term ? 0 : gs.length);
+  }
+
+  /** Lights the chip for wherever the reader is, and scrolls it back into a bar swiped past it. */
+  function mark(sec) {
+    var chips = $('chips');
+    Array.prototype.forEach.call(chips.children, function (c) {
+      var on = c.getAttribute('data-sec') === sec;
+      c.classList.toggle('now', on);
+      if (on && (c.offsetLeft < chips.scrollLeft || c.offsetLeft + c.offsetWidth > chips.scrollLeft + chips.clientWidth)) {
+        chips.scrollTo({ left: Math.max(0, c.offsetLeft - 16), behavior: 'smooth' });
+      }
+    });
+  }
+
+  function spy(n) {
+    if (spyObserver) { spyObserver.disconnect(); spyObserver = null; }
+    if (!n || !window.IntersectionObserver) return;
+    spyObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        // ทั้งหมด owns the very top, so the first section does not take the highlight on load.
+        if (en.isIntersecting && window.scrollY >= 8) mark(en.target.id.slice(3));
+      });
+    // Only the band just under the sticky chips counts as "where you are".
+    }, { rootMargin: '-64px 0px -70% 0px' });
+    for (var i = 0; i < n; i++) spyObserver.observe($('sec' + i));
+  }
+
+  function rowOf(code) {
+    var rows = $('list').querySelectorAll('li');
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].dataset.row === code) return rows[i];
+    }
+    return null;
+  }
+
+  // Repaints ONE row. Rebuilding the list would throw away every quantity typed into the other rows
+  // but not yet added, and take the focus with it.
+  function paint(code) {
+    var li = rowOf(code);
+    if (!li) return;
+    var line = lineOf(code);
+    li.querySelector('.act').innerHTML = controls(code, line ? line.qty : null);
+    li.classList.toggle('picked', !!line);
+  }
+
+  function addLine(code, li) {
+    if (state.basket.length >= data.lineLimit) return toast('เลือกได้สูงสุด ' + data.lineLimit + ' รายการ');
+    var typed = parseFloat(li.querySelector('.qty').value);
+    var it = byNo[code];
+    state.basket.push({ no: it.no, name: it.name, uom: it.uom, qty: typed > 0 ? typed : 1 });
+    paint(code);
+    drawDocket();
+  }
+
+  function stepLine(code, delta) {
+    var line = lineOf(code);
+    if (!line || line.qty + delta < 1) return;
+    line.qty += delta;
+    paint(code);
+    drawDocket();
+  }
+
+  function removeLine(code) {
+    state.basket = state.basket.filter(function (l) { return l.no !== code; });
+    paint(code);
+    drawDocket();
+  }
+
+  function drawDocket() {
     var n = state.basket.length;
-    $('lineCount').textContent = n;
-    $('barCount').textContent = n;
-    $('basketEmpty').hidden = n > 0;
-    if (n > 0) document.querySelector('[data-err="basket"]').textContent = '';
-    $('bar').classList.toggle('full', n >= data.lineLimit);
+    $('docket').hidden = n === 0;
+    $('count').textContent = n + ' / ' + data.lineLimit + ' รายการ';
+    $('count').classList.toggle('full', n >= data.lineLimit);
+    $('lines').innerHTML = state.basket.map(function (l) {
+      return '<button type="button" data-drop="' + esc(l.no) + '" title="ลบออกจากตะกร้า">' + esc(l.no) +
+        '</button> &times;' + esc(String(l.qty));
+    }).join('&nbsp; &middot; &nbsp;');
+  }
+
+  function bindShop() {
+    $('chips').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      var sec = b.getAttribute('data-sec');
+      if (sec === 'top') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return mark('top');
+      }
+      var el = $('sec' + sec);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    // closest, not e.target: the buttons' whole label is an SVG, so a tap lands on the path inside.
+    $('list').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      var li = b.closest('li');
+      var code = li.dataset.row;
+      var act = b.getAttribute('data-act');
+      if (act === 'del') return removeLine(code);
+      if (act === 'dec') return stepLine(code, -1);
+      // + puts a line in the basket, and is its increment once it is there - "one more" both times.
+      if (lineOf(code)) return stepLine(code, 1);
+      addLine(code, li);
+    });
+    // A quantity typed into a row already in the basket counts as you type. Not repainted: that
+    // would pull the focus out of the box being typed in.
+    $('list').addEventListener('input', function (e) {
+      if (!e.target.classList.contains('qty')) return;
+      var li = e.target.closest('li');
+      var line = lineOf(li.dataset.row);
+      var qty = parseFloat(e.target.value);
+      if (!line || !(qty > 0)) return;
+      line.qty = qty;
+      var dec = li.querySelector('[data-act="dec"]');
+      if (dec) dec.disabled = qty <= 1;
+      drawDocket();
+    });
+    $('lines').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-drop]');
+      if (b) removeLine(b.getAttribute('data-drop'));
+    });
+    $('wipe').addEventListener('click', function () {
+      var codes = state.basket.map(function (l) { return l.no; });
+      state.basket = [];
+      codes.forEach(paint);
+      drawDocket();
+    });
+    $('next').addEventListener('click', next);
+    $('clear').addEventListener('click', function () {
+      $('search').value = '';
+      renderList();
+      $('search').focus();
+    });
+    // Debounced like the Form's catalogue: every keystroke rebuilds every row, and a Thai IME fires
+    // input far more often than a Latin one.
+    $('search').addEventListener('input', function () {
+      clearTimeout(typing);
+      typing = setTimeout(renderList, 120);
+    });
+    window.addEventListener('scroll', function () {
+      if (window.scrollY < 8) mark('top');
+    }, { passive: true });
+    // The phone's back button on the buyer screen returns to the basket instead of closing LINE's
+    // window with the basket in it. Once sent there is nothing to go back to.
+    window.addEventListener('popstate', function () {
+      if (sent || $('form').hidden) return;
+      show('shop');
+      window.scrollTo(0, shopScroll);
+    });
+  }
+
+  function next() {
+    if (!state.basket.length) return;
+    shopScroll = window.scrollY;
+    renderSummary();
+    show('buyer');
+    history.pushState({ screen: 'buyer' }, '');
+  }
+
+  // --- Screen 2: the buyer -----------------------------------------------------------------------
+
+  /** The basket read back, so a wrong quantity is caught here rather than on the quote. */
+  function renderSummary() {
+    $('sumCount').textContent = state.basket.length + ' รายการ';
+    $('summary').innerHTML = state.basket.map(function (l) {
+      return '<li><span class="s-code">' + esc(l.no) + '</span><span class="s-name">' + esc(l.name) + '</span>' +
+        '<span class="s-qty">× ' + esc(String(l.qty) + (l.uom ? ' ' + l.uom : '')) + '</span></li>';
+    }).join('');
   }
 
   function bindForm() {
@@ -287,6 +486,7 @@
       state.useBinding = false;
       syncBuyer();
     });
+    $('back').addEventListener('click', function () { history.back(); });
     $('send').addEventListener('click', send);
     $('close').addEventListener('click', function () {
       if (liff.isInClient()) liff.closeWindow(); else window.close();
@@ -347,13 +547,9 @@
   }
 
   function done(reference) {
-    $('form').hidden = true;
-    $('bar').hidden = true;
-    clearTimeout(toastTimer);
-    $('toast').hidden = true;
+    sent = true;
     $('reference').textContent = reference;
-    $('done').hidden = false;
-    window.scrollTo(0, 0);
+    show('done');
     // In the customer's own name, into the chat the page was opened from - no OA message, no quota,
     // and it gives sales a thread to answer in. Anywhere LINE will not post (a link opened in a
     // browser) the confirmation on screen has already said everything.

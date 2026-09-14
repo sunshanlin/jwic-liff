@@ -6,144 +6,366 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ขอใบเสนอราคา</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
 <style>
-  :root { --ink: #1f2328; --muted: #6b7280; --line: #e5e7eb; --ground: #f4f5f7; --go: #06c755; --bad: #d1242f; }
+  /* ponytail: the Catalogue half of this sheet is copied from buildCataloguePage_ in the library, so
+     the LINE page and the Form's catalogue read as one product. Two copies until ADR 0005 §9 merges
+     the two catalogue pages - until then a visual change goes into both. */
+  :root {
+    --sans: "Archivo", "IBM Plex Sans Thai", "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --paper: #EDF1F4; --card: #FFFFFF; --ink: #16222C; --muted: #63737F;
+    --rule: #CBD5DD; --stamp: #C0392B; --ok: #1D6F42; --focus: #1F5FA8; --go: #E8762A;
+    --shadow: 0 1px 0 rgba(22,34,44,.04), 0 6px 20px -12px rgba(22,34,44,.35);
+  }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; color: var(--ink); background: var(--ground); }
-  .top { padding: 16px; background: #fff; border-bottom: 1px solid var(--line); }
-  h1 { margin: 0; font-size: 20px; }
-  h2 { margin: 0 0 12px; font-size: 17px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .notice { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
-  .panel { margin: 12px; padding: 16px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
-  .fatal { color: var(--bad); }
-  input, select, textarea { width: 100%; margin-top: 4px; padding: 10px 12px; font: inherit; color: inherit; background: #fff; border: 1px solid #cfd4dc; border-radius: 8px; }
-  .f { display: block; margin-top: 12px; }
-  fieldset { margin: 12px 0 0; padding: 0; border: 0; }
-  legend { padding: 0; }
-  .choice { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
-  .choice input { width: auto; margin: 0; }
-  .items, .basket { list-style: none; margin: 12px 0 0; padding: 0; }
-  .items { max-height: 55vh; overflow-y: auto; }
-  .items li, .basket li { display: grid; grid-template-columns: 1fr 72px auto; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
-  .items input, .basket input { margin: 0; padding: 8px 4px; text-align: center; }
-  .name { font-weight: 600; }
-  .meta, .hint, .count { font-size: 13px; color: var(--muted); font-weight: 400; }
-  .badge { padding: 1px 8px; font-size: 12px; font-weight: 600; color: #067d3a; background: #e6f7ec; border-radius: 999px; white-space: nowrap; }
-  .err { display: block; font-size: 13px; color: var(--bad); }
-  button { padding: 10px 14px; font: inherit; font-weight: 600; color: #fff; background: var(--go); border: 0; border-radius: 8px; }
-  button:disabled { opacity: .6; }
-  .link { padding: 4px 0; font-weight: 500; color: #0b63ce; background: none; }
-  .bound { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; background: #f0fbf4; border: 1px solid #bfe9cf; border-radius: 8px; }
-  .spacer { height: 80px; }
-  .bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid var(--line); }
-  .bar.full b { color: var(--bad); }
-  .done { text-align: center; }
-  .toast { position: fixed; left: 16px; right: 16px; bottom: 88px; padding: 10px 14px; color: #fff; text-align: center; background: var(--ink); border-radius: 8px; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans);
+    font-size: 15px; line-height: 1.5; -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 20px 16px 0; }
+  .screen { padding-bottom: 132px; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .step { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+  .lead { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+  .tally { font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cat {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    margin: 22px 2px 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  }
+  .cat span { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; text-transform: none; }
+  .card { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); }
+  .pad { padding: 2px 16px 18px; }
+
+  /* --- Screen 1: the Catalogue ------------------------------------------------------------------ */
+  .search { position: relative; margin: 14px 0 0; }
+  .search svg { position: absolute; left: 14px; top: 50%; margin-top: -9px; color: var(--muted); }
+  #search {
+    width: 100%; font: inherit; font-size: 16px; padding: 13px 14px 13px 42px; color: inherit;
+    background: var(--card); border: 1px solid var(--rule); border-radius: 10px; box-shadow: var(--shadow);
+    -webkit-appearance: none; appearance: none;
+  }
+  #search::placeholder { color: var(--muted); }
+  /* Full-bleed on purpose: a bar that scrolls sideways past the screen edge is the cue that there are
+     more categories to swipe to. */
+  #chips {
+    position: sticky; top: 0; z-index: 5; display: flex; gap: 8px; overflow-x: auto;
+    margin: 14px -16px 0; padding: 10px 16px; background: var(--paper); border-bottom: 1px solid var(--rule);
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  #chips::-webkit-scrollbar { display: none; }
+  #chips button { flex: none; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; letter-spacing: .04em; }
+  #chips button.now { color: #fff; background: var(--ink); border-color: var(--ink); }
+  .group { scroll-margin-top: 64px; }
+  .group:first-child .cat { margin-top: 16px; }
+  .items {
+    list-style: none; margin: 0; padding: 0; overflow: hidden;
+    background: var(--card); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow);
+  }
+  .items li {
+    display: grid; gap: 2px 14px; padding: 14px 16px; border-top: 1px solid var(--rule); align-items: center;
+    grid-template-columns: 1fr auto; grid-template-areas: "code stamp" "name name" "meta meta" "act act";
+  }
+  .items li:first-child { border-top: 0; }
+  .items li.picked { background: #F5FAF6; }
+  .items .code { grid-area: code; font-size: 13px; font-weight: 600; letter-spacing: .06em; font-variant-numeric: tabular-nums; }
+  .items .name { grid-area: name; font-weight: 500; }
+  .items .meta { grid-area: meta; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .items .act { grid-area: act; display: flex; gap: 6px; align-items: center; justify-content: flex-end; margin-top: 6px; }
+  /* Only the good news gets a label; everything else simply reads grey and can still be quoted. */
+  .items .stamp {
+    grid-area: stamp; justify-self: end; padding: 3px 9px; font-size: 11px; font-weight: 600; letter-spacing: .04em;
+    white-space: nowrap; color: var(--ok); background: #E3F3E8; border: 1px solid #BCDDC6; border-radius: 999px;
+  }
+  .items li.dim .code, .items li.dim .name { color: var(--muted); }
+  /* Delete sits apart from the stepper, so the tap that removes a line is never next to the one
+     that changes it. */
+  .act .del { margin-left: 8px; }
+  .qty {
+    width: 72px; font: inherit; font-size: 15px; text-align: center; padding: 7px 6px; color: inherit;
+    background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; font-variant-numeric: tabular-nums;
+  }
+  .qty::placeholder { color: var(--muted); font-size: 13px; }
+  .empty { padding: 40px 4px; color: var(--muted); text-align: center; }
+  .empty button { margin-top: 12px; }
+
+  button {
+    font: inherit; font-size: 13px; font-weight: 500; padding: 8px 14px; cursor: pointer; white-space: nowrap;
+    color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 8px;
+  }
+  button:hover { border-color: var(--ink); }
+  button:disabled { opacity: .35; cursor: default; }
+  button:disabled:hover { border-color: var(--rule); }
+  button.icon { width: 38px; height: 38px; padding: 0; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+  button.on { color: var(--stamp); background: #FBEDEB; border-color: #E2B4AE; }
+  button.on:hover { border-color: var(--stamp); }
+  .link { padding: 4px 0; font-size: 13px; font-weight: 600; color: var(--focus); background: none; border: 0; }
+
+  /* The dock: dark, so the one band always on screen reads as a slip the page scrolls under rather
+     than another white card that happens not to move. */
+  .dock {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    color: #EDF1F4; background: var(--ink); box-shadow: 0 -10px 30px -16px rgba(22,34,44,.8);
+  }
+  .dock::before {
+    content: ""; display: block; height: 5px;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,.3) 0 5px, transparent 5px 11px);
+  }
+  .dock :focus-visible { outline-color: #9CC4F0; }
+  .dock-in {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    max-width: 880px; margin: 0 auto; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+  .count {
+    flex: none; padding: 7px 12px; font-size: 12px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums;
+    color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
+  }
+  .count.full { color: #FFD9D3; background: rgba(224,122,110,.24); border-color: rgba(224,122,110,.55); }
+  .lines { flex: 1; min-width: 0; max-height: 44px; overflow: hidden; font-size: 12px; line-height: 1.7; color: rgba(237,241,244,.62); }
+  .lines button {
+    margin: 0 2px; padding: 0 0 1px; font-size: 12px; font-weight: 600; color: #fff;
+    background: none; border: 0; border-bottom: 1px solid rgba(255,255,255,.35); border-radius: 0;
+  }
+  .lines button:hover { color: #FF9A8F; border-bottom-color: #FF9A8F; }
+  .dock-act { display: flex; align-items: center; gap: 10px; flex: none; }
+  /* The only saturated colour on the page, spent on the way forward. Dark text: white on this orange
+     is about 2.9:1. */
+  .go { padding: 12px 20px; font-size: 15px; font-weight: 600; color: var(--ink); background: var(--go); border-color: var(--go); }
+  .go:hover { background: #D2661D; border-color: #D2661D; }
+  .quiet { padding: 8px 10px; color: rgba(237,241,244,.62); background: none; border-color: transparent; }
+  .quiet:hover { color: #fff; border-color: transparent; }
+  #wipe:hover { color: #FF9A8F; }
+
+  /* --- Screen 2: the buyer ------------------------------------------------------------------------ */
+  .sum { list-style: none; margin: 0; padding: 0; }
+  .sum li { display: flex; align-items: baseline; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--rule); }
+  .sum li:first-child { border-top: 0; }
+  .s-code { flex: none; min-width: 44px; font-size: 13px; font-weight: 600; letter-spacing: .06em; font-variant-numeric: tabular-nums; }
+  .s-name { flex: 1; min-width: 0; font-weight: 500; }
+  .s-qty { flex: none; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .card > .err { margin: 0; padding: 0 16px 12px; }
+  fieldset { min-width: 0; margin: 14px 0 0; padding: 0; border: 0; }
+  legend { padding: 0; font-size: 13px; font-weight: 600; }
+  .f { display: block; margin-top: 14px; font-size: 13px; font-weight: 600; }
+  .f > input, .f > select, .f > textarea {
+    display: block; width: 100%; min-height: 46px; margin-top: 6px; padding: 11px 12px;
+    font: inherit; font-size: 16px; font-weight: 400; color: inherit;
+    background: var(--card); border: 1px solid var(--rule); border-radius: 10px;
+    -webkit-appearance: none; appearance: none;
+  }
+  .f > select {
+    padding-right: 36px;
+    background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2363737F' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+  }
+  .f > textarea { resize: vertical; }
+  .f > input:focus, .f > select:focus, .f > textarea:focus {
+    outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(31,95,168,.15);
+  }
+  .f:has(.err:not(:empty)) > input, .f:has(.err:not(:empty)) > select { border-color: var(--stamp); }
+  .hint { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .err { display: block; margin-top: 5px; font-size: 13px; font-weight: 500; color: var(--stamp); }
+  .err:empty { display: none; }
+  .choices { display: grid; gap: 8px; margin-top: 8px; }
+  .choices.two { grid-template-columns: 1fr 1fr; }
+  .choice {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer;
+    font-size: 15px; font-weight: 500; line-height: 1.35;
+    background: var(--card); border: 1px solid var(--rule); border-radius: 10px;
+  }
+  .choice input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
+  .choice small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+  .choice:has(input:checked) { background: #F5FAF6; border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .bound {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px;
+    padding: 12px 14px; background: #F5FAF6; border: 1px solid #BCDDC6; border-radius: 10px;
+  }
+  .pdpa { margin: 16px 2px 0; font-size: 12px; color: var(--muted); }
+
+  /* --- Loading, failure, confirmation ------------------------------------------------------------- */
+  .center { margin: 20px 0 0; padding: 40px 16px; text-align: center; color: var(--muted); }
+  .fatal { margin: 20px 0 0; padding: 20px 16px; color: var(--stamp); }
+  .finish { margin-top: 10vh; padding: 32px 20px 26px; text-align: center; }
+  .finish p { margin: 8px 0 0; }
+  .tick { display: block; width: 56px; height: 56px; margin: 0 auto 14px; }
+  .ref {
+    display: inline-block; padding: 6px 14px; font-size: 20px; letter-spacing: .1em; font-variant-numeric: tabular-nums;
+    background: var(--paper); border: 1px solid var(--rule); border-radius: 10px;
+  }
+  .finish .go { min-width: 160px; margin-top: 20px; }
+  .toast {
+    position: fixed; left: 16px; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 20;
+    max-width: 520px; margin: 0 auto; padding: 11px 16px; font-size: 14px; text-align: center;
+    color: #fff; background: var(--ink); border: 1px solid rgba(255,255,255,.18); border-radius: 10px;
+    box-shadow: 0 10px 30px -12px rgba(22,34,44,.6);
+  }
+
+  @media (min-width: 680px) {
+    .items li {
+      grid-template-columns: 132px 1fr 100px 232px; gap: 0 16px;
+      grid-template-areas: "code name stamp act" "code meta stamp act";
+    }
+    .items .act { margin-top: 0; }
+    .items .stamp { justify-self: start; }
+    h1 { font-size: 22px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    button, .choice { transition: color .15s ease, border-color .15s ease, background .15s ease; }
+  }
 </style>
 </head>
 <body>
-<header class="top">
-  <h1>ขอใบเสนอราคา</h1>
-  <p id="notice" class="notice"></p>
-</header>
+<div id="loading" class="wrap"><p class="card center">กำลังโหลดรายการสินค้า…</p></div>
+<div id="fatal" class="wrap" hidden><p id="fatalText" class="card fatal"></p></div>
 
-<p id="loading" class="panel">กำลังโหลด…</p>
-<p id="fatal" class="panel fatal" hidden></p>
-
-<form id="form" hidden novalidate>
-  <section class="panel">
-    <h2>1. เลือกสินค้า</h2>
-    <input id="search" type="search" placeholder="ค้นหาชื่อ รหัส หรือหมวดสินค้า" autocomplete="off" aria-label="ค้นหาสินค้า">
-    <ul id="items" class="items"></ul>
-  </section>
-
-  <section class="panel">
-    <h2>ตะกร้า <span class="count"><span id="lineCount">0</span> / <span id="limit"></span> รายการ</span></h2>
-    <ul id="basket" class="basket"></ul>
-    <p id="basketEmpty" class="hint">ยังไม่มีสินค้าในตะกร้า</p>
-    <small class="err" data-err="basket"></small>
-  </section>
-
-  <section class="panel">
-    <h2>2. ข้อมูลผู้ซื้อ</h2>
-    <div id="bound" class="bound" hidden>
-      <div>สั่งในนาม <b id="boundName"></b></div>
-      <button type="button" id="rebind" class="link">ไม่ใช่? กรอกใหม่</button>
+<section id="shop" class="screen" hidden>
+  <div class="wrap">
+    <header class="head">
+      <div>
+        <p class="step">ขั้นที่ 1 จาก 2</p>
+        <h1>ขอใบเสนอราคา</h1>
+      </div>
+      <span id="tally" class="tally" aria-live="polite"></span>
+    </header>
+    <p class="lead">เลือกสินค้าและจำนวน แล้วกด “ถัดไป” เพื่อกรอกข้อมูลผู้ซื้อ</p>
+    <div class="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="ค้นหาชื่อสินค้า รหัส หรือหมวด" autocomplete="off" aria-label="ค้นหาสินค้า">
     </div>
-    <fieldset id="identityChoice">
-      <legend>ท่านเป็น</legend>
-      <label class="choice"><input type="radio" name="identity" value="returning"> ลูกค้าเดิม (เคยสั่งซื้อแล้ว)</label>
-      <label class="choice"><input type="radio" name="identity" value="company"> ลูกค้าใหม่ ในนามนิติบุคคล</label>
-      <label class="choice"><input type="radio" name="identity" value="person"> ลูกค้าใหม่ ในนามบุคคลธรรมดา</label>
-      <small class="err" data-err="identity"></small>
-    </fieldset>
+    <nav id="chips" aria-label="หมวดสินค้า"></nav>
+    <div id="list"></div>
+    <div id="empty" class="empty" hidden>ไม่พบสินค้าที่ตรงกับคำค้น<br><button type="button" id="clear">ล้างคำค้น</button></div>
+  </div>
+  <div id="docket" class="dock" hidden>
+    <div class="dock-in">
+      <span id="count" class="count" aria-live="polite"></span>
+      <span id="lines" class="lines"></span>
+      <span class="dock-act">
+        <button type="button" id="wipe" class="quiet">ล้างทั้งหมด</button>
+        <button type="button" id="next" class="go">ถัดไป</button>
+      </span>
+    </div>
+  </div>
+</section>
 
-    <label class="f" data-for="company">ชื่อกิจการตามหน้าจดทะเบียน
-      <input name="companyName" maxlength="100" autocomplete="organization">
-      <small class="err" data-err="companyName"></small></label>
-    <fieldset class="f" data-for="company">
-      <legend>ประเภทสถานประกอบการ</legend>
-      <label class="choice"><input type="radio" name="branchType" value="HeadOffice" checked> สำนักงานใหญ่</label>
-      <label class="choice"><input type="radio" name="branchType" value="Branch"> สาขา</label>
-    </fieldset>
-    <label class="f" data-for="person">ชื่อ-นามสกุล
-      <input name="personName" maxlength="100" autocomplete="name">
-      <small class="err" data-err="personName"></small></label>
-    <label class="f" data-for="returning company person"><span id="taxLabel">เลขประจำตัวผู้เสียภาษี 13 หลัก</span>
-      <input name="taxId" inputmode="numeric" maxlength="17">
-      <small class="err" data-err="taxId"></small></label>
-    <label class="f" data-for="branch">เลขที่สาขา 5 หลัก <span id="branchHint" class="hint"></span>
-      <input name="branchNo" inputmode="numeric" maxlength="5">
-      <small class="err" data-err="branchNo"></small></label>
+<form id="form" class="screen" hidden novalidate>
+  <div class="wrap">
+    <header class="head">
+      <div>
+        <p class="step">ขั้นที่ 2 จาก 2</p>
+        <h1>ข้อมูลผู้ซื้อ</h1>
+      </div>
+    </header>
 
-    <label class="f" data-for="company person">เลขที่/หมู่/ซอย/ถนน
-      <input name="address1" maxlength="100" autocomplete="address-line1">
-      <small class="err" data-err="address1"></small></label>
-    <label class="f" data-for="company person">ตำบล/แขวง
-      <input name="subDistrict" maxlength="50"></label>
-    <label class="f" data-for="company person">อำเภอ/เขต
-      <input name="district" maxlength="50"></label>
-    <label class="f" data-for="company person">จังหวัด
-      <select name="city" id="city"><option value="">เลือกจังหวัด</option></select>
-      <small class="err" data-err="city"></small></label>
-    <label class="f" data-for="company person">รหัสไปรษณีย์ 5 หลัก
-      <input name="postCode" inputmode="numeric" maxlength="5" autocomplete="postal-code">
-      <small class="err" data-err="postCode"></small></label>
-  </section>
+    <h2 class="cat">สินค้าที่ขอราคา <span id="sumCount"></span></h2>
+    <div class="card">
+      <ul id="summary" class="sum"></ul>
+      <small class="err" data-err="basket"></small>
+    </div>
 
-  <section class="panel">
-    <h2>3. รายละเอียดเพิ่มเติม <span class="hint">ไม่บังคับ</span></h2>
-    <label class="f">วันที่ต้องการรับสินค้า
-      <input type="date" name="deliveryDate"></label>
-    <label class="f">หมายเหตุถึงฝ่ายขาย
-      <textarea name="note" rows="3" maxlength="2000"></textarea></label>
-    <label class="f">ชื่อผู้ติดต่อ
-      <input name="contactName" maxlength="100" autocomplete="name"></label>
-    <label class="f">เบอร์โทร
-      <input name="phone" type="tel" maxlength="30" autocomplete="tel"></label>
-    <label class="f">อีเมล
-      <input name="email" type="email" maxlength="80" autocomplete="email">
-      <small class="err" data-err="email"></small></label>
-  </section>
-  <div class="spacer"></div>
+    <h2 class="cat">ผู้ซื้อ</h2>
+    <div class="card pad">
+      <div id="bound" class="bound" hidden>
+        <div>สั่งในนาม <b id="boundName"></b></div>
+        <button type="button" id="rebind" class="link">ไม่ใช่? กรอกใหม่</button>
+      </div>
+      <fieldset id="identityChoice">
+        <legend>ท่านเป็น</legend>
+        <div class="choices">
+          <label class="choice"><input type="radio" name="identity" value="returning"><span>ลูกค้าเดิม<small>เคยสั่งซื้อแล้ว</small></span></label>
+          <label class="choice"><input type="radio" name="identity" value="company"><span>ลูกค้าใหม่ ในนามนิติบุคคล</span></label>
+          <label class="choice"><input type="radio" name="identity" value="person"><span>ลูกค้าใหม่ ในนามบุคคลธรรมดา</span></label>
+        </div>
+        <small class="err" data-err="identity"></small>
+      </fieldset>
+
+      <label class="f" data-for="company">ชื่อกิจการตามหน้าจดทะเบียน
+        <input name="companyName" maxlength="100" autocomplete="organization">
+        <small class="err" data-err="companyName"></small></label>
+      <fieldset class="f" data-for="company">
+        <legend>ประเภทสถานประกอบการ</legend>
+        <div class="choices two">
+          <label class="choice"><input type="radio" name="branchType" value="HeadOffice" checked><span>สำนักงานใหญ่</span></label>
+          <label class="choice"><input type="radio" name="branchType" value="Branch"><span>สาขา</span></label>
+        </div>
+      </fieldset>
+      <label class="f" data-for="person">ชื่อ-นามสกุล
+        <input name="personName" maxlength="100" autocomplete="name">
+        <small class="err" data-err="personName"></small></label>
+      <div class="pair">
+        <label class="f" data-for="returning company person"><span id="taxLabel">เลขประจำตัวผู้เสียภาษี 13 หลัก</span>
+          <input name="taxId" inputmode="numeric" maxlength="17">
+          <small class="err" data-err="taxId"></small></label>
+        <label class="f" data-for="branch">เลขที่สาขา 5 หลัก <span id="branchHint" class="hint"></span>
+          <input name="branchNo" inputmode="numeric" maxlength="5">
+          <small class="err" data-err="branchNo"></small></label>
+      </div>
+      <label class="f" data-for="company person">เลขที่/หมู่/ซอย/ถนน
+        <input name="address1" maxlength="100" autocomplete="address-line1">
+        <small class="err" data-err="address1"></small></label>
+      <div class="pair">
+        <label class="f" data-for="company person">ตำบล/แขวง
+          <input name="subDistrict" maxlength="50"></label>
+        <label class="f" data-for="company person">อำเภอ/เขต
+          <input name="district" maxlength="50"></label>
+      </div>
+      <div class="pair">
+        <label class="f" data-for="company person">จังหวัด
+          <select name="city" id="city"><option value="">เลือกจังหวัด</option></select>
+          <small class="err" data-err="city"></small></label>
+        <label class="f" data-for="company person">รหัสไปรษณีย์ 5 หลัก
+          <input name="postCode" inputmode="numeric" maxlength="5" autocomplete="postal-code">
+          <small class="err" data-err="postCode"></small></label>
+      </div>
+    </div>
+
+    <h2 class="cat">รายละเอียดเพิ่มเติม <span>ไม่บังคับ</span></h2>
+    <div class="card pad">
+      <label class="f">วันที่ต้องการรับสินค้า
+        <input type="date" name="deliveryDate"></label>
+      <label class="f">หมายเหตุถึงฝ่ายขาย
+        <textarea name="note" rows="3" maxlength="2000"></textarea></label>
+      <div class="pair">
+        <label class="f">ชื่อผู้ติดต่อ
+          <input name="contactName" maxlength="100" autocomplete="name"></label>
+        <label class="f">เบอร์โทร
+          <input name="phone" type="tel" maxlength="30" autocomplete="tel"></label>
+      </div>
+      <label class="f">อีเมล
+        <input name="email" type="email" maxlength="80" autocomplete="email">
+        <small class="err" data-err="email"></small></label>
+    </div>
+    <p id="notice" class="pdpa"></p>
+  </div>
+  <div class="dock">
+    <div class="dock-in">
+      <button type="button" id="back" class="quiet">‹ แก้ตะกร้า</button>
+      <button type="button" id="send" class="go">ส่งคำขอราคา</button>
+    </div>
+  </div>
 </form>
 
-<div id="bar" class="bar" hidden>
-  <span><b id="barCount">0</b> / <span id="barLimit"></span> รายการ</span>
-  <button type="button" id="send">ส่งคำขอราคา</button>
-</div>
-
-<section id="done" class="panel done" hidden>
-  <h2 style="justify-content:center">ส่งคำขอราคาแล้ว</h2>
-  <p>เลขอ้างอิง <b id="reference"></b></p>
-  <p class="hint">ฝ่ายขายจะตรวจราคาแล้วติดต่อกลับ</p>
-  <button type="button" id="close">ปิด</button>
+<section id="done" class="screen" hidden>
+  <div class="wrap">
+    <div class="card finish">
+      <svg class="tick" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="27" fill="#E3F3E8" stroke="#BCDDC6"/><path d="M17 29l7 7 15-16" fill="none" stroke="#1D6F42" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h1>ส่งคำขอราคาแล้ว</h1>
+      <p class="lead">เลขอ้างอิง</p>
+      <p><b id="reference" class="ref"></b></p>
+      <p class="hint">ฝ่ายขายจะตรวจราคาแล้วติดต่อกลับ</p>
+      <button type="button" id="close" class="go">ปิด</button>
+    </div>
+  </div>
 </section>
 
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=72e8c6d6"></script>
 </body>
 </html>
