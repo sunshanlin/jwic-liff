@@ -496,7 +496,12 @@
     $('list').addEventListener('error', function (e) {
       if (e.target.tagName === 'IMG') e.target.hidden = true;
     }, true);
-    $('zoom').addEventListener('click', unzoom);
+    $('zoom').addEventListener('click', function (e) {
+      // The text is there to be read and copied: a click inside it, or the end of a drag that selected some of it, keeps
+      // the popup open. A click on the picture or the backdrop closes it.
+      if (e.target.closest('.zoom-text') || String(window.getSelection())) return;
+      unzoom();
+    });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && !$('zoom').hidden) unzoom();
     });
