@@ -444,12 +444,31 @@
     }).join('&nbsp; &middot; &nbsp;');
   }
 
+  // The row's picture, as large as the screen allows. The same URL the row loaded, so it opens from the cache.
+  // No history entry: the buyer screen owns popstate, and a tap anywhere is the way out.
+  function zoom(code, src) {
+    $('zoomImg').src = src;
+    $('zoomName').textContent = byNo[code] ? byNo[code].name : code;
+    $('zoom').hidden = false;
+    document.body.classList.add('zooming');
+  }
+
+  function unzoom() {
+    $('zoom').hidden = true;
+    $('zoomImg').removeAttribute('src');
+    document.body.classList.remove('zooming');
+  }
+
   function bindShop() {
     // An item with no picture answers 404: the image goes, its box stays, so every row keeps one alignment.
     // Captured, because error does not bubble.
     $('list').addEventListener('error', function (e) {
       if (e.target.tagName === 'IMG') e.target.hidden = true;
     }, true);
+    $('zoom').addEventListener('click', unzoom);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !$('zoom').hidden) unzoom();
+    });
     $('chips').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
@@ -463,6 +482,8 @@
     });
     // closest, not e.target: the buttons' whole label is an SVG, so a tap lands on the path inside.
     $('list').addEventListener('click', function (e) {
+      var pic = e.target.closest('.thumb img');
+      if (pic) return zoom(pic.closest('li').dataset.row, pic.src);
       var b = e.target.closest('button[data-act]');
       if (!b) return;
       var li = b.closest('li');
