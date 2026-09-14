@@ -94,14 +94,27 @@
     background: var(--paper); border: 1px solid var(--rule); border-radius: 8px;
   }
   .items .thumb img { display: block; width: 100%; height: 100%; object-fit: contain; background: var(--card); cursor: pointer; }
-  /* A tapped picture, over everything: the row's small one at once, then the large one (size=large) once it has loaded. */
+  /* Marketing Text, when any item has one: two lines on the row, the whole of it in the popup. */
+  .items .desc {
+    grid-area: desc; margin-top: 2px; font-size: 13px; line-height: 1.5; color: var(--muted); cursor: pointer;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  }
+  .descs .items li { grid-template-areas: "code stamp" "name name" "meta meta" "desc desc" "act act"; }
+  .descs.thumbs .items li { grid-template-areas: "thumb code stamp" "thumb name name" "thumb meta meta" ". desc desc" "act act act"; }
+  /* A tapped picture or text, over everything: the row's small picture at once, then the large one (size=large) once
+     it has loaded, with the item's Marketing Text under it - beside it on a wide screen. */
   .zoom {
     position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
     padding: 16px; background: rgba(22,34,44,.9);
   }
-  .zoom img { width: 100%; max-width: 640px; max-height: 75vh; object-fit: contain; background: var(--card); border-radius: 12px; }
-  .zoom p { margin: 0; max-width: 640px; color: #fff; font-weight: 500; text-align: center; }
+  .zoom-body { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 640px; min-height: 0; }
+  .zoom img { width: 100%; max-height: 75vh; object-fit: contain; background: var(--card); border-radius: 12px; }
+  .zoom.has-desc img { max-height: 45vh; }
+  .zoom-text { width: 100%; min-height: 0; overflow-y: auto; color: #fff; }
+  .zoom.has-desc .zoom-text { max-height: 35vh; }
+  #zoomName { margin: 0; font-weight: 500; text-align: center; }
+  #zoomDesc { margin: 10px 0 0; font-size: 14px; line-height: 1.65; color: rgba(255,255,255,.82); white-space: pre-line; }
   .zoom small { font-size: 12px; color: rgba(255,255,255,.62); }
   body.zooming { overflow: hidden; }
   /* Delete sits apart from the stepper, so the tap that removes a line is never next to the one
@@ -244,6 +257,21 @@
       grid-template-areas: "thumb code name stamp act" "thumb code meta stamp act";
     }
     .items .thumb { align-self: center; }
+    /* The text takes a column of its own between the name and the stamp, so the shop widens to give it room. */
+    .descs .items li {
+      grid-template-columns: 132px minmax(0, 1fr) minmax(0, 1.4fr) 100px 232px;
+      grid-template-areas: "code name desc stamp act" "code meta desc stamp act";
+    }
+    .descs.thumbs .items li {
+      grid-template-columns: 56px 132px minmax(0, 1fr) minmax(0, 1.4fr) 100px 232px;
+      grid-template-areas: "thumb code name desc stamp act" "thumb code meta desc stamp act";
+    }
+    .items .desc { margin-top: 0; align-self: center; }
+    #shop.descs .wrap, #shop.descs .dock-in { max-width: 1080px; }
+    .zoom.has-desc .zoom-body { flex-direction: row; gap: 28px; max-width: 1040px; }
+    .zoom.has-desc img { flex: 0 0 58%; width: 58%; max-height: 80vh; }
+    .zoom.has-desc .zoom-text { flex: 1; max-height: 80vh; }
+    .zoom.has-desc #zoomName { font-size: 18px; text-align: left; }
     .items .act { margin-top: 0; }
     .items .stamp { justify-self: start; }
     h1 { font-size: 22px; }
@@ -399,14 +427,19 @@
 </section>
 
 <div id="zoom" class="zoom" role="dialog" aria-modal="true" aria-labelledby="zoomName" hidden>
-  <img id="zoomImg" alt="">
-  <p id="zoomName"></p>
+  <div class="zoom-body">
+    <img id="zoomImg" alt="">
+    <div class="zoom-text">
+      <p id="zoomName"></p>
+      <p id="zoomDesc" hidden></p>
+    </div>
+  </div>
   <small>แตะที่ใดก็ได้เพื่อปิด</small>
 </div>
 
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="app.js?v=6c0ea710"></script>
+<script src="app.js?v=fbda3281"></script>
 </body>
 </html>

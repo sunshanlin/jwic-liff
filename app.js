@@ -262,6 +262,10 @@
         (b.branchNo ? ' สาขา ' + b.branchNo : '');
     }
     $('list').classList.toggle('thumbs', !!IMG);
+    // The text column and the wider shop only when some item has Marketing Text to put in them.
+    var descs = data.items.some(function (it) { return !!it.marketingText; });
+    $('list').classList.toggle('descs', descs);
+    $('shop').classList.toggle('descs', descs);
     bindShop();
     bindForm();
     var resumed = restore();
@@ -342,6 +346,8 @@
       '<span class="code">' + esc(it.no) + '</span>' +
       '<span class="name">' + esc(it.name) + '</span>' +
       '<span class="meta">' + esc(meta) + '</span>' +
+      // Two lines of it here; a tap opens the whole text with the picture.
+      (it.marketingText ? '<span class="desc">' + esc(it.marketingText) + '</span>' : '') +
       (it.inStock ? '<span class="stamp">In stock</span>' : '') +
       '<span class="act">' + controls(it.no, line ? line.qty : null) + '</span></li>';
   }
@@ -447,22 +453,33 @@
     }).join('&nbsp; &middot; &nbsp;');
   }
 
-  // The row's picture, as large as the screen allows. The row's small one is already loaded, so it shows at once; the
-  // large one takes its place when it arrives, if that item's popup is still the one open. An item with no large
-  // picture keeps the small one. No history entry: the buyer screen owns popstate, and a tap anywhere is the way out.
-  function zoom(code, src) {
+  // A row's picture as large as the screen allows, with its whole Marketing Text. The row's small picture is already
+  // loaded, so it shows at once; the large one takes its place when it arrives, if that item's popup is still the one
+  // open. An item with no large picture keeps the small one, and one with no picture at all opens on its text alone.
+  // No history entry: the buyer screen owns popstate, and a tap anywhere is the way out.
+  function zoom(li) {
+    var code = li.dataset.row;
+    var it = byNo[code] || {};
+    var thumb = li.querySelector('.thumb img:not([hidden])');
     var shown = $('zoomImg');
-    var large = imageUrl(IMG, code, true);
-    var loader = new Image();
-    shown.src = src;
+    var text = it.marketingText || '';
+    shown.hidden = !thumb;
     shown.dataset.code = code;
-    $('zoomName').textContent = byNo[code] ? byNo[code].name : code;
+    if (thumb) {
+      var large = imageUrl(IMG, code, true);
+      var loader = new Image();
+      shown.src = thumb.src;
+      loader.onload = function () {
+        if (!$('zoom').hidden && shown.dataset.code === code) shown.src = large;
+      };
+      loader.src = large;
+    }
+    $('zoomName').textContent = it.name || code;
+    $('zoomDesc').textContent = text;
+    $('zoomDesc').hidden = !text;
+    $('zoom').classList.toggle('has-desc', !!text);
     $('zoom').hidden = false;
     document.body.classList.add('zooming');
-    loader.onload = function () {
-      if (!$('zoom').hidden && shown.dataset.code === code) shown.src = large;
-    };
-    loader.src = large;
   }
 
   function unzoom() {
@@ -496,8 +513,7 @@
     });
     // closest, not e.target: the buttons' whole label is an SVG, so a tap lands on the path inside.
     $('list').addEventListener('click', function (e) {
-      var pic = e.target.closest('.thumb img');
-      if (pic) return zoom(pic.closest('li').dataset.row, pic.src);
+      if (e.target.closest('.thumb img, .desc')) return zoom(e.target.closest('li'));
       var b = e.target.closest('button[data-act]');
       if (!b) return;
       var li = b.closest('li');
