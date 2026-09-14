@@ -124,7 +124,8 @@
   var grouped = true;
   var shopScroll = 0;
   var sent = false;
-  var spyObserver = null;
+  // The category a chip narrowed the list to; blank is ทั้งหมด.
+  var picked = '';
   var typing = 0;
   var toastTimer = 0;
 
@@ -359,46 +360,36 @@
       // sales reads off the quote while on the phone with them.
       return [it.no, it.name, it.category, it.categoryName].join(' ').toLowerCase().indexOf(term) > -1;
     });
-    $('tally').textContent = (term ? shown.length + ' / ' : '') + data.items.length + ' รายการ';
-    $('empty').hidden = shown.length > 0;
+    // A chip narrows the list to its category; a search looks through the whole Catalogue, so typing lets go of it.
+    var all = groups(shown);
+    if (term || !all.some(function (g) { return g.cat === picked; })) picked = '';
+    var gs = picked ? all.filter(function (g) { return g.cat === picked; }) : all;
+    var count = gs.reduce(function (n, g) { return n + g.items.length; }, 0);
+    $('tally').textContent = (term || picked ? count + ' / ' : '') + data.items.length + ' รายการ';
+    $('empty').hidden = count > 0;
     grouped = !term;
-    var gs = groups(shown);
-    $('list').innerHTML = gs.map(function (g, i) {
-      return '<section class="group" id="sec' + i + '"><h2 class="cat">' + esc(g.cat) +
+    $('list').innerHTML = gs.map(function (g) {
+      return '<section class="group"><h2 class="cat">' + esc(g.cat) +
         '<span>' + g.items.length + ' รายการ</span></h2>' +
         '<ul class="items">' + g.items.map(row).join('') + '</ul></section>';
     }).join('');
-    // The chips are a map of the whole Catalogue, so they only show while nothing is filtered.
+    // The chips are a map of the whole Catalogue, so they only show while nothing is typed. The picked one is dark.
     var chips = $('chips');
     chips.hidden = !!term;
-    chips.innerHTML = term ? '' : '<button type="button" data-sec="top" class="now">ทั้งหมด</button>' +
-      gs.map(function (g, i) { return '<button type="button" data-sec="' + i + '">' + esc(g.cat) + '</button>'; }).join('');
-    spy(term ? 0 : gs.length);
+    chips.innerHTML = term ? '' : chip('', 'ทั้งหมด') + all.map(function (g) { return chip(g.cat, g.cat); }).join('');
   }
 
-  /** Lights the chip for wherever the reader is, and scrolls it back into a bar swiped past it. */
-  function mark(sec) {
+  function chip(cat, label) {
+    return '<button type="button" data-cat="' + esc(cat) + '"' + (cat === picked ? ' class="now"' : '') + '>' +
+      esc(label) + '</button>';
+  }
+
+  /** Scrolls a chip swiped past back into the bar. */
+  function reveal(c) {
     var chips = $('chips');
-    Array.prototype.forEach.call(chips.children, function (c) {
-      var on = c.getAttribute('data-sec') === sec;
-      c.classList.toggle('now', on);
-      if (on && (c.offsetLeft < chips.scrollLeft || c.offsetLeft + c.offsetWidth > chips.scrollLeft + chips.clientWidth)) {
-        chips.scrollTo({ left: Math.max(0, c.offsetLeft - 16), behavior: 'smooth' });
-      }
-    });
-  }
-
-  function spy(n) {
-    if (spyObserver) { spyObserver.disconnect(); spyObserver = null; }
-    if (!n || !window.IntersectionObserver) return;
-    spyObserver = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) {
-        // ทั้งหมด owns the very top, so the first section does not take the highlight on load.
-        if (en.isIntersecting && window.scrollY >= 8) mark(en.target.id.slice(3));
-      });
-    // Only the band just under the sticky chips counts as "where you are".
-    }, { rootMargin: '-64px 0px -70% 0px' });
-    for (var i = 0; i < n; i++) spyObserver.observe($('sec' + i));
+    if (c && (c.offsetLeft < chips.scrollLeft || c.offsetLeft + c.offsetWidth > chips.scrollLeft + chips.clientWidth)) {
+      chips.scrollTo({ left: Math.max(0, c.offsetLeft - 16), behavior: 'smooth' });
+    }
   }
 
   function rowOf(code) {
@@ -505,16 +496,16 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && !$('zoom').hidden) unzoom();
     });
+    // A chip narrows the list to its category and turns dark; ทั้งหมด brings the whole Catalogue back.
     $('chips').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
-      var sec = b.getAttribute('data-sec');
-      if (sec === 'top') {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return mark('top');
-      }
-      var el = $('sec' + sec);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      picked = b.getAttribute('data-cat');
+      renderList();
+      reveal($('chips').querySelector('.now'));
+      // The shorter list starts again from its first row, just under the sticky chips - if it was scrolled past that.
+      var top = $('list').getBoundingClientRect().top + window.scrollY - $('chips').offsetHeight;
+      if (window.scrollY > top) window.scrollTo({ top: top, behavior: 'smooth' });
     });
     // closest, not e.target: the buttons' whole label is an SVG, so a tap lands on the path inside.
     $('list').addEventListener('click', function (e) {
@@ -565,9 +556,6 @@
       clearTimeout(typing);
       typing = setTimeout(renderList, 120);
     });
-    window.addEventListener('scroll', function () {
-      if (window.scrollY < 8) mark('top');
-    }, { passive: true });
     // The phone's back button on the buyer screen returns to the basket instead of closing LINE's
     // window with the basket in it. Once sent there is nothing to go back to.
     window.addEventListener('popstate', function () {
