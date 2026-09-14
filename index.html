@@ -1,0 +1,149 @@
+<!doctype html>
+<!-- Copyright (c) 2026 JWIC. All rights reserved.
+     Licensed to the named customer for internal use only. Redistribution or resale prohibited. -->
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ขอใบเสนอราคา</title>
+<style>
+  :root { --ink: #1f2328; --muted: #6b7280; --line: #e5e7eb; --ground: #f4f5f7; --go: #06c755; --bad: #d1242f; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; color: var(--ink); background: var(--ground); }
+  .top { padding: 16px; background: #fff; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0; font-size: 20px; }
+  h2 { margin: 0 0 12px; font-size: 17px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .notice { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+  .panel { margin: 12px; padding: 16px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+  .fatal { color: var(--bad); }
+  input, select, textarea { width: 100%; margin-top: 4px; padding: 10px 12px; font: inherit; color: inherit; background: #fff; border: 1px solid #cfd4dc; border-radius: 8px; }
+  .f { display: block; margin-top: 12px; }
+  fieldset { margin: 12px 0 0; padding: 0; border: 0; }
+  legend { padding: 0; }
+  .choice { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+  .choice input { width: auto; margin: 0; }
+  .items, .basket { list-style: none; margin: 12px 0 0; padding: 0; }
+  .items { max-height: 55vh; overflow-y: auto; }
+  .items li, .basket li { display: grid; grid-template-columns: 1fr 72px auto; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .items input, .basket input { margin: 0; padding: 8px 4px; text-align: center; }
+  .name { font-weight: 600; }
+  .meta, .hint, .count { font-size: 13px; color: var(--muted); font-weight: 400; }
+  .badge { padding: 1px 8px; font-size: 12px; font-weight: 600; color: #067d3a; background: #e6f7ec; border-radius: 999px; white-space: nowrap; }
+  .err { display: block; font-size: 13px; color: var(--bad); }
+  button { padding: 10px 14px; font: inherit; font-weight: 600; color: #fff; background: var(--go); border: 0; border-radius: 8px; }
+  button:disabled { opacity: .6; }
+  .link { padding: 4px 0; font-weight: 500; color: #0b63ce; background: none; }
+  .bound { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; background: #f0fbf4; border: 1px solid #bfe9cf; border-radius: 8px; }
+  .spacer { height: 80px; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid var(--line); }
+  .bar.full b { color: var(--bad); }
+  .done { text-align: center; }
+  .toast { position: fixed; left: 16px; right: 16px; bottom: 88px; padding: 10px 14px; color: #fff; text-align: center; background: var(--ink); border-radius: 8px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>ขอใบเสนอราคา</h1>
+  <p id="notice" class="notice"></p>
+</header>
+
+<p id="loading" class="panel">กำลังโหลด…</p>
+<p id="fatal" class="panel fatal" hidden></p>
+
+<form id="form" hidden novalidate>
+  <section class="panel">
+    <h2>1. เลือกสินค้า</h2>
+    <input id="search" type="search" placeholder="ค้นหาชื่อ รหัส หรือหมวดสินค้า" autocomplete="off" aria-label="ค้นหาสินค้า">
+    <ul id="items" class="items"></ul>
+  </section>
+
+  <section class="panel">
+    <h2>ตะกร้า <span class="count"><span id="lineCount">0</span> / <span id="limit"></span> รายการ</span></h2>
+    <ul id="basket" class="basket"></ul>
+    <p id="basketEmpty" class="hint">ยังไม่มีสินค้าในตะกร้า</p>
+    <small class="err" data-err="basket"></small>
+  </section>
+
+  <section class="panel">
+    <h2>2. ข้อมูลผู้ซื้อ</h2>
+    <div id="bound" class="bound" hidden>
+      <div>สั่งในนาม <b id="boundName"></b></div>
+      <button type="button" id="rebind" class="link">ไม่ใช่? กรอกใหม่</button>
+    </div>
+    <fieldset id="identityChoice">
+      <legend>ท่านเป็น</legend>
+      <label class="choice"><input type="radio" name="identity" value="returning"> ลูกค้าเดิม (เคยสั่งซื้อแล้ว)</label>
+      <label class="choice"><input type="radio" name="identity" value="company"> ลูกค้าใหม่ ในนามนิติบุคคล</label>
+      <label class="choice"><input type="radio" name="identity" value="person"> ลูกค้าใหม่ ในนามบุคคลธรรมดา</label>
+      <small class="err" data-err="identity"></small>
+    </fieldset>
+
+    <label class="f" data-for="company">ชื่อกิจการตามหน้าจดทะเบียน
+      <input name="companyName" maxlength="100" autocomplete="organization">
+      <small class="err" data-err="companyName"></small></label>
+    <fieldset class="f" data-for="company">
+      <legend>ประเภทสถานประกอบการ</legend>
+      <label class="choice"><input type="radio" name="branchType" value="HeadOffice" checked> สำนักงานใหญ่</label>
+      <label class="choice"><input type="radio" name="branchType" value="Branch"> สาขา</label>
+    </fieldset>
+    <label class="f" data-for="person">ชื่อ-นามสกุล
+      <input name="personName" maxlength="100" autocomplete="name">
+      <small class="err" data-err="personName"></small></label>
+    <label class="f" data-for="returning company person"><span id="taxLabel">เลขประจำตัวผู้เสียภาษี 13 หลัก</span>
+      <input name="taxId" inputmode="numeric" maxlength="17">
+      <small class="err" data-err="taxId"></small></label>
+    <label class="f" data-for="branch">เลขที่สาขา 5 หลัก <span id="branchHint" class="hint"></span>
+      <input name="branchNo" inputmode="numeric" maxlength="5">
+      <small class="err" data-err="branchNo"></small></label>
+
+    <label class="f" data-for="company person">เลขที่/หมู่/ซอย/ถนน
+      <input name="address1" maxlength="100" autocomplete="address-line1">
+      <small class="err" data-err="address1"></small></label>
+    <label class="f" data-for="company person">ตำบล/แขวง
+      <input name="subDistrict" maxlength="50"></label>
+    <label class="f" data-for="company person">อำเภอ/เขต
+      <input name="district" maxlength="50"></label>
+    <label class="f" data-for="company person">จังหวัด
+      <select name="city" id="city"><option value="">เลือกจังหวัด</option></select>
+      <small class="err" data-err="city"></small></label>
+    <label class="f" data-for="company person">รหัสไปรษณีย์ 5 หลัก
+      <input name="postCode" inputmode="numeric" maxlength="5" autocomplete="postal-code">
+      <small class="err" data-err="postCode"></small></label>
+  </section>
+
+  <section class="panel">
+    <h2>3. รายละเอียดเพิ่มเติม <span class="hint">ไม่บังคับ</span></h2>
+    <label class="f">วันที่ต้องการรับสินค้า
+      <input type="date" name="deliveryDate"></label>
+    <label class="f">หมายเหตุถึงฝ่ายขาย
+      <textarea name="note" rows="3" maxlength="2000"></textarea></label>
+    <label class="f">ชื่อผู้ติดต่อ
+      <input name="contactName" maxlength="100" autocomplete="name"></label>
+    <label class="f">เบอร์โทร
+      <input name="phone" type="tel" maxlength="30" autocomplete="tel"></label>
+    <label class="f">อีเมล
+      <input name="email" type="email" maxlength="80" autocomplete="email">
+      <small class="err" data-err="email"></small></label>
+  </section>
+  <div class="spacer"></div>
+</form>
+
+<div id="bar" class="bar" hidden>
+  <span><b id="barCount">0</b> / <span id="barLimit"></span> รายการ</span>
+  <button type="button" id="send">ส่งคำขอราคา</button>
+</div>
+
+<section id="done" class="panel done" hidden>
+  <h2 style="justify-content:center">ส่งคำขอราคาแล้ว</h2>
+  <p>เลขอ้างอิง <b id="reference"></b></p>
+  <p class="hint">ฝ่ายขายจะตรวจราคาแล้วติดต่อกลับ</p>
+  <button type="button" id="close">ปิด</button>
+</section>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
