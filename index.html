@@ -83,6 +83,17 @@
     white-space: nowrap; color: var(--ok); background: #E3F3E8; border: 1px solid #BCDDC6; border-radius: 999px;
   }
   .items li.dim .code, .items li.dim .name { color: var(--muted); }
+  /* Item pictures, only when the endpoint URL names an img base (ADR 0007). LIFF only: the Form's catalogue
+     has no picture column, so these rules have no twin in buildCataloguePage_. */
+  .thumbs .items li {
+    grid-template-columns: 56px 1fr auto;
+    grid-template-areas: "thumb code stamp" "thumb name name" "thumb meta meta" "act act act";
+  }
+  .items .thumb {
+    grid-area: thumb; align-self: start; width: 56px; height: 56px; overflow: hidden;
+    background: var(--paper); border: 1px solid var(--rule); border-radius: 8px;
+  }
+  .items .thumb img { display: block; width: 100%; height: 100%; object-fit: contain; background: var(--card); }
   /* Delete sits apart from the stepper, so the tap that removes a line is never next to the one
      that changes it. */
   .act .del { margin-left: 8px; }
@@ -218,6 +229,11 @@
       grid-template-columns: 132px 1fr 100px 232px; gap: 0 16px;
       grid-template-areas: "code name stamp act" "code meta stamp act";
     }
+    .thumbs .items li {
+      grid-template-columns: 56px 132px 1fr 100px 232px;
+      grid-template-areas: "thumb code name stamp act" "thumb code meta stamp act";
+    }
+    .items .thumb { align-self: center; }
     .items .act { margin-top: 0; }
     .items .stamp { justify-self: start; }
     h1 { font-size: 22px; }
@@ -375,6 +391,6 @@
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="app.js?v=967ffc8c"></script>
+<script src="app.js?v=aa88d7da"></script>
 </body>
 </html>

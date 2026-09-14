@@ -5,7 +5,9 @@
  * The LINE Channel's Quote Request page (docs/adr/0005-liff-to-quote.md, GitHub #52).
  *
  * One page for every customer. The LIFF app's endpoint URL carries the only configuration:
- *   https://<pages host>/?liffId=<LIFF ID>&api=<URL-encoded Apps Script /exec URL>
+ *   https://<pages host>/?liffId=<LIFF ID>&api=<URL-encoded Apps Script /exec URL>[&img=<URL-encoded picture base>]
+ * img is optional and names where item pictures live - a Cloudflare Worker's /img/ (ADR 0007), whichever
+ * endpoint api points at. Without it the list simply has no pictures.
  *
  * Two screens: the Catalogue with its docket, then the buyer. That is the order the Form's own flow
  * already taught (catalogue, ยืนยัน, form), and on a phone it gives the list the whole screen.
@@ -84,8 +86,13 @@
     };
   }
 
+  /** An item's picture: the img base, then the item code as ONE path segment - a code may contain a slash. */
+  function imageUrl(base, no) {
+    return base + encodeURIComponent(no);
+  }
+
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { validate: validate, buildSubmitBody: buildSubmitBody };
+    module.exports = { validate: validate, buildSubmitBody: buildSubmitBody, imageUrl: imageUrl };
     return;
   }
 
@@ -96,6 +103,7 @@
   var params = new URLSearchParams(location.search);
   var LIFF_ID = params.get('liffId') || '';
   var API = params.get('api') || '';
+  var IMG = params.get('img') || '';
   var SAVED = 'jwic-quote-request:' + LIFF_ID;
   var RELOGIN = 'jwic-quote-relogin:' + LIFF_ID;
   // Where an item with no category is filed - the same word the Form's catalogue uses.
@@ -250,6 +258,7 @@
       $('boundName').textContent = (b.buyerName || 'เลขประจำตัวผู้เสียภาษี ' + b.taxIdMasked) +
         (b.branchNo ? ' สาขา ' + b.branchNo : '');
     }
+    $('list').classList.toggle('thumbs', !!IMG);
     bindShop();
     bindForm();
     var resumed = restore();
@@ -325,6 +334,8 @@
     var cls = [line ? 'picked' : '', it.inStock ? '' : 'dim'].filter(Boolean).join(' ');
     var meta = (grouped ? [it.uom] : [catOf(it), it.uom]).filter(Boolean).join(' · ');
     return '<li data-row="' + esc(it.no) + '"' + (cls ? ' class="' + cls + '"' : '') + '>' +
+      // lazy: a phone fetches only the pictures scrolled near, however long the Catalogue.
+      (IMG ? '<span class="thumb"><img loading="lazy" alt="" src="' + esc(imageUrl(IMG, it.no)) + '"></span>' : '') +
       '<span class="code">' + esc(it.no) + '</span>' +
       '<span class="name">' + esc(it.name) + '</span>' +
       '<span class="meta">' + esc(meta) + '</span>' +
@@ -434,6 +445,11 @@
   }
 
   function bindShop() {
+    // An item with no picture answers 404: the image goes, its box stays, so every row keeps one alignment.
+    // Captured, because error does not bubble.
+    $('list').addEventListener('error', function (e) {
+      if (e.target.tagName === 'IMG') e.target.hidden = true;
+    }, true);
     $('chips').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
