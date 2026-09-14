@@ -94,7 +94,7 @@
     background: var(--paper); border: 1px solid var(--rule); border-radius: 8px;
   }
   .items .thumb img { display: block; width: 100%; height: 100%; object-fit: contain; background: var(--card); cursor: zoom-in; }
-  /* A tapped picture, over everything. The same file as the row's, which BC sends at 800 px. */
+  /* A tapped picture, over everything: the row's small one at once, then the large one (size=large) once it has loaded. */
   .zoom {
     position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 30;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
@@ -407,6 +407,6 @@
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="app.js?v=fd2405a6"></script>
+<script src="app.js?v=6c0ea710"></script>
 </body>
 </html>

@@ -86,9 +86,12 @@
     };
   }
 
-  /** An item's picture: the img base, then the item code as ONE path segment - a code may contain a slash. */
-  function imageUrl(base, no) {
-    return base + encodeURIComponent(no);
+  /**
+   * An item's picture: the img base, then the item code as ONE path segment - a code may contain a slash.
+   * large asks for the popup's picture rather than the list row's.
+   */
+  function imageUrl(base, no, large) {
+    return base + encodeURIComponent(no) + (large ? '?size=large' : '');
   }
 
   if (typeof module !== 'undefined' && module.exports) {
@@ -444,18 +447,29 @@
     }).join('&nbsp; &middot; &nbsp;');
   }
 
-  // The row's picture, as large as the screen allows. The same URL the row loaded, so it opens from the cache.
-  // No history entry: the buyer screen owns popstate, and a tap anywhere is the way out.
+  // The row's picture, as large as the screen allows. The row's small one is already loaded, so it shows at once; the
+  // large one takes its place when it arrives, if that item's popup is still the one open. An item with no large
+  // picture keeps the small one. No history entry: the buyer screen owns popstate, and a tap anywhere is the way out.
   function zoom(code, src) {
-    $('zoomImg').src = src;
+    var shown = $('zoomImg');
+    var large = imageUrl(IMG, code, true);
+    var loader = new Image();
+    shown.src = src;
+    shown.dataset.code = code;
     $('zoomName').textContent = byNo[code] ? byNo[code].name : code;
     $('zoom').hidden = false;
     document.body.classList.add('zooming');
+    loader.onload = function () {
+      if (!$('zoom').hidden && shown.dataset.code === code) shown.src = large;
+    };
+    loader.src = large;
   }
 
   function unzoom() {
+    var shown = $('zoomImg');
     $('zoom').hidden = true;
-    $('zoomImg').removeAttribute('src');
+    shown.removeAttribute('src');
+    delete shown.dataset.code;
     document.body.classList.remove('zooming');
   }
 
