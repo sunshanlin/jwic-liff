@@ -498,12 +498,14 @@
     // The chips are a map of the whole Catalogue, so they only show while nothing is typed. The picked one is dark.
     var chips = $('chips');
     chips.hidden = !!term;
-    chips.innerHTML = term ? '' : chip('', 'ทั้งหมด') + all.map(function (g) { return chip(g.cat, g.cat); }).join('');
+    chips.innerHTML = term ? '' : chip('', 'ทั้งหมด', data.items.length) +
+      all.map(function (g) { return chip(g.cat, g.cat, g.items.length); }).join('');
   }
 
-  function chip(cat, label) {
+  /** A category chip, with how many items it holds on its right. */
+  function chip(cat, label, n) {
     return '<button type="button" data-cat="' + esc(cat) + '"' + (cat === picked ? ' class="now"' : '') + '>' +
-      esc(label) + '</button>';
+      esc(label) + '<span class="n">' + n + '</span></button>';
   }
 
   /** Scrolls a chip swiped past back into the bar. */
