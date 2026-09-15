@@ -235,10 +235,10 @@
 
   /* --- Loading, failure, confirmation ------------------------------------------------------------- */
   .center { margin: 20px 0 0; padding: 40px 16px; text-align: center; color: var(--muted); }
-  /* Indeterminate: there's one fetch and no byte count to report real percent against, so the fill
-     just sweeps. Static at 40% under reduced motion - still reads as "in progress", not stalled. */
+  /* Staged, not simulated: progress() in app.js sets the width at each real point in start()/render()
+     (LIFF SDK ready, API responded, page painted) - never a timer guessing at how long a fetch takes. */
   .bar { width: 160px; height: 6px; margin: 16px auto 0; background: var(--rule); border-radius: 999px; overflow: hidden; }
-  .bar-fill { width: 40%; height: 100%; background: var(--focus); border-radius: inherit; }
+  #bar { display: block; width: 0; height: 100%; background: var(--focus); border-radius: inherit; }
   .fatal { margin: 20px 0 0; padding: 20px 16px; color: var(--stamp); }
   .finish { margin-top: 10vh; padding: 32px 20px 26px; text-align: center; }
   .finish p { margin: 8px 0 0; }
@@ -288,11 +288,7 @@
   }
   @media (prefers-reduced-motion: no-preference) {
     button, .choice { transition: color .15s ease, border-color .15s ease, background .15s ease; }
-    .bar-fill { animation: bar-sweep 1.1s ease-in-out infinite; }
-  }
-  @keyframes bar-sweep {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(350%); }
+    #bar { transition: width .25s ease; }
   }
 </style>
 </head>
@@ -300,7 +296,7 @@
 <div id="loading" class="wrap">
   <div class="card center">
     <p>กำลังโหลดรายการสินค้า…</p>
-    <div class="bar"><div class="bar-fill"></div></div>
+    <div class="bar"><div id="bar" role="progressbar" aria-label="กำลังโหลด" aria-valuemin="0" aria-valuemax="100"></div></div>
   </div>
 </div>
 <div id="fatal" class="wrap" hidden><p id="fatalText" class="card fatal"></p></div>
@@ -459,6 +455,6 @@
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="app.js?v=1e1d0af8"></script>
+<script src="app.js?v=448a3865"></script>
 </body>
 </html>

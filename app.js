@@ -178,6 +178,14 @@
     $('fatal').hidden = false;
   }
 
+  /** Staged, not simulated: each call marks a real point in start()/render(), not a timer guessing. */
+  function progress(pct) {
+    var el = $('bar');
+    if (!el) return;
+    el.style.width = pct + '%';
+    el.setAttribute('aria-valuenow', pct);
+  }
+
   function toast(message, long) {
     var el = $('toast');
     el.textContent = message;
@@ -188,15 +196,18 @@
 
   function start() {
     if (!LIFF_ID || !API) return fail('ลิงก์นี้ตั้งค่าไม่ครบ กรุณาติดต่อร้านค้า');
+    progress(10);
     liff.init({ liffId: LIFF_ID })
       .then(function () {
         if (!liff.isLoggedIn()) {
           liff.login({ redirectUri: location.href });
           return null;
         }
+        progress(45);
         return call('liffInit', { idToken: liff.getIDToken() }).then(function (res) {
           if (res.code === 'auth' && onExpired()) return;
           if (res.error) return fail(errorText(res));
+          progress(85);
           data = res;
           render();
         });
@@ -278,6 +289,7 @@
     renderList();
     drawDocket();
     syncBuyer();
+    progress(100);
     $('loading').hidden = true;
     $('shop').hidden = false;
     if (resumed) {
