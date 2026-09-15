@@ -161,7 +161,10 @@
     color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
   }
   .count.full { color: #FFD9D3; background: rgba(224,122,110,.24); border-color: rgba(224,122,110,.55); }
-  .lines { flex: 1; min-width: 0; max-height: 44px; overflow: hidden; font-size: 12px; line-height: 1.7; color: rgba(237,241,244,.62); }
+  /* overflow-y, not hidden: on a narrow phone .lines is squeezed thin by .count and .dock-act beside
+     it, so a full basket wraps past the 2-line cap - hidden was silently dropping the rest of the
+     list rather than just capping its height. Scrollable keeps every line reachable. */
+  .lines { flex: 1; min-width: 0; max-height: 44px; overflow-y: auto; -webkit-overflow-scrolling: touch; font-size: 12px; line-height: 1.7; color: rgba(237,241,244,.62); }
   .lines button {
     margin: 0 2px; padding: 0 0 1px; font-size: 12px; font-weight: 600; color: #fff;
     background: none; border: 0; border-bottom: 1px solid rgba(255,255,255,.35); border-radius: 0;
@@ -232,6 +235,10 @@
 
   /* --- Loading, failure, confirmation ------------------------------------------------------------- */
   .center { margin: 20px 0 0; padding: 40px 16px; text-align: center; color: var(--muted); }
+  /* Indeterminate: there's one fetch and no byte count to report real percent against, so the fill
+     just sweeps. Static at 40% under reduced motion - still reads as "in progress", not stalled. */
+  .bar { width: 160px; height: 6px; margin: 16px auto 0; background: var(--rule); border-radius: 999px; overflow: hidden; }
+  .bar-fill { width: 40%; height: 100%; background: var(--focus); border-radius: inherit; }
   .fatal { margin: 20px 0 0; padding: 20px 16px; color: var(--stamp); }
   .finish { margin-top: 10vh; padding: 32px 20px 26px; text-align: center; }
   .finish p { margin: 8px 0 0; }
@@ -281,11 +288,21 @@
   }
   @media (prefers-reduced-motion: no-preference) {
     button, .choice { transition: color .15s ease, border-color .15s ease, background .15s ease; }
+    .bar-fill { animation: bar-sweep 1.1s ease-in-out infinite; }
+  }
+  @keyframes bar-sweep {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
   }
 </style>
 </head>
 <body>
-<div id="loading" class="wrap"><p class="card center">กำลังโหลดรายการสินค้า…</p></div>
+<div id="loading" class="wrap">
+  <div class="card center">
+    <p>กำลังโหลดรายการสินค้า…</p>
+    <div class="bar"><div class="bar-fill"></div></div>
+  </div>
+</div>
 <div id="fatal" class="wrap" hidden><p id="fatalText" class="card fatal"></p></div>
 
 <section id="shop" class="screen" hidden>
@@ -442,6 +459,6 @@
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="app.js?v=ad6d5297"></script>
+<script src="app.js?v=1e1d0af8"></script>
 </body>
 </html>

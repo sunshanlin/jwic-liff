@@ -132,8 +132,13 @@
   var SVG = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" ' +
     'stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
   // A bin rather than a minus for delete: minus reads as "one fewer", which is the stepper's job.
-  var GLYPH = { inc: 'M9 4v10M4 9h10', dec: 'M4 9h10', del: 'M3.5 5.5h11M7.5 5.5V3.5h3v2M5.8 5.5l.7 8.5h5l.7-8.5' };
-  var LABEL = { inc: 'เพิ่มจำนวน ', dec: 'ลดจำนวน ', del: 'ลบออกจากตะกร้า ' };
+  // add's cart glyph is Feather's shopping-cart path scaled to this grid (bbox lines up with del's);
+  // the two wheels are round-capped zero-length strokes, not <circle> - ctrl() only emits one <path>.
+  var GLYPH = {
+    inc: 'M9 4v10M4 9h10', dec: 'M4 9h10', del: 'M3.5 5.5h11M7.5 5.5V3.5h3v2M5.8 5.5l.7 8.5h5l.7-8.5',
+    add: 'M3.5 3.75h2l1.34 6.7a1 1 0 0 0 1 .81h4.86a1 1 0 0 0 1-.81L14.5 6.25H6M7.5 13.75h.01M13 13.75h.01'
+  };
+  var LABEL = { inc: 'เพิ่มจำนวน ', dec: 'ลดจำนวน ', del: 'ลบออกจากตะกร้า ', add: 'เพิ่มลงตะกร้า ' };
 
   function $(id) { return document.getElementById(id); }
 
@@ -333,7 +338,7 @@
   function controls(code, qty) {
     var box = '<input class="qty" type="number" min="1" step="any" inputmode="decimal" placeholder="จำนวน" ' +
       'aria-label="จำนวน ' + esc(code) + '" value="' + (qty === null ? '' : esc(String(qty))) + '">';
-    if (qty === null) return box + ctrl('inc', code, false);
+    if (qty === null) return box + ctrl('add', code, false);
     return ctrl('dec', code, qty <= 1) + box + ctrl('inc', code, false) + ctrl('del', code, false);
   }
 
