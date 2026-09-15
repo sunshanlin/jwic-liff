@@ -292,7 +292,9 @@
     syncBuyer();
     progress(100);
     // A beat so 100% actually paints before the switch - matches the bar's own CSS transition
-    // (index.html), so the number the buyer saw counting up doesn't jump straight past it.
+    // (index.html), so the number the buyer saw counting up doesn't jump straight past it. This is
+    // the only artificial delay in the whole screen; the rest of "loading" is liff.init() and the
+    // API round-trip, which this timer has no control over.
     setTimeout(function () {
       $('loading').hidden = true;
       $('shop').hidden = false;
@@ -300,7 +302,7 @@
         next();
         toast('ข้อมูลที่กรอกไว้ยังอยู่ กด “ส่งคำขอราคา” อีกครั้ง', true);
       }
-    }, 300);
+    }, 150);
   }
 
   function show(screen) {
