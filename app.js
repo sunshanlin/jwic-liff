@@ -111,6 +111,8 @@
   var RELOGIN = 'jwic-quote-relogin:' + LIFF_ID;
   // v1: bump when the liffInit answer changes shape, so a new page never draws an old page's leftovers.
   var CATALOGUE = 'jwic-quote-catalogue-v1:' + LIFF_ID;
+  // Tile or list, as this phone last chose.
+  var VIEW = 'jwic-quote-view:' + LIFF_ID;
   // Where an item with no category is filed - the same word the Form's catalogue uses.
   var OTHER = 'อื่นๆ';
   var data = null;
@@ -344,8 +346,31 @@
     });
     bindShop();
     bindForm();
+    // Tiles are pictures first, so only a Catalogue with pictures offers them - and starts on them.
+    var saved = null;
+    try {
+      saved = localStorage.getItem(VIEW);
+    } catch (err) {
+      // Storage blocked: every visit starts on the default.
+    }
+    $('views').hidden = !IMG;
+    setView(IMG && saved !== 'list' ? 'tile' : 'list', false);
     drawCatalogue();
     syncBuyer();
+  }
+
+  /** Lays the list out as tiles or rows. A class, not a rebuild: a quantity being typed keeps its focus. */
+  function setView(v, remember) {
+    $('list').classList.toggle('tiles', v === 'tile');
+    Array.prototype.forEach.call($('views').children, function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-view') === v));
+    });
+    if (!remember) return;
+    try {
+      localStorage.setItem(VIEW, v);
+    } catch (err) {
+      // Storage blocked: the choice lasts this visit.
+    }
   }
 
   /** Everything the shop draws from data.items - again when the endpoint's Catalogue is not the one remembered. */
@@ -665,6 +690,10 @@
       state.basket = [];
       codes.forEach(paint);
       drawDocket();
+    });
+    $('views').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-view]');
+      if (b) setView(b.getAttribute('data-view'), true);
     });
     $('next').addEventListener('click', next);
     $('clear').addEventListener('click', function () {

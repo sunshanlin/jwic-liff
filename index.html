@@ -103,6 +103,40 @@
   }
   .descs .items li { grid-template-areas: "code stamp" "name name" "meta meta" "desc desc" "act act"; }
   .descs.thumbs .items li { grid-template-areas: "thumb code stamp" "thumb name name" "thumb meta meta" ". desc desc" "act act act"; }
+  /* Tile view - the toggle beside the tally, offered only when there are pictures: the same row markup laid out as a
+     card, two to a row on a phone. Written against #list so every list rule, the wide-screen ones included, gives way. */
+  .head-side { display: flex; align-items: center; gap: 10px; }
+  .views { display: inline-flex; gap: 4px; }
+  .views button.icon { width: 34px; height: 34px; }
+  .views button[aria-pressed="true"] { color: #fff; background: var(--ink); border-color: var(--ink); }
+  #list.tiles .items {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+    overflow: visible; background: none; border: 0; box-shadow: none;
+  }
+  #list.tiles .items li {
+    position: relative; padding: 10px; gap: 2px 8px; align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto auto auto 1fr;
+    grid-template-areas: "thumb thumb" "code stamp" "name name" "meta meta" "desc desc" "act act";
+    background: var(--card); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow);
+  }
+  #list.tiles .items li.picked { background: #F5FAF6; border-color: var(--ok); }
+  #list.tiles .items .thumb { width: 100%; height: auto; aspect-ratio: 1; margin-bottom: 6px; align-self: stretch; }
+  #list.tiles .items .code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #list.tiles .items .stamp { justify-self: end; }
+  #list.tiles .items .name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  #list.tiles .items .desc { margin-top: 2px; -webkit-line-clamp: 1; align-self: start; }
+  #list.tiles .items .act { align-self: end; gap: 4px; margin-top: 8px; }
+  #list.tiles .items .act button.icon { width: 32px; height: 32px; }
+  #list.tiles .items .act [data-act="add"] { flex: 1; width: auto; }
+  #list.tiles .items .qty { flex: 1; width: 0; min-width: 0; padding: 5px 2px; }
+  /* Delete leaves the stepper for the picture's corner: three buttons and a box do not fit half a phone. */
+  #list.tiles .items .act .del { position: absolute; top: 16px; right: 16px; margin-left: 0; }
+  @media (min-width: 680px) {
+    #list.tiles .items { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  }
+  @media (min-width: 1000px) {
+    #list.tiles .items { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
   /* A tapped picture or text, over everything: the row's small picture at once, then the large one (size=large) once
      it has loaded, with the item's Marketing Text under it - beside it on a wide screen. */
   .zoom {
@@ -316,7 +350,13 @@
         <p class="step">ขั้นที่ 1 จาก 2</p>
         <h1>ขอใบเสนอราคา</h1>
       </div>
-      <span id="tally" class="tally" aria-live="polite"></span>
+      <div class="head-side">
+        <span id="tally" class="tally" aria-live="polite"></span>
+        <div id="views" class="views" role="group" aria-label="มุมมอง" hidden>
+          <button type="button" class="icon" data-view="tile" aria-label="แบบการ์ด" title="แบบการ์ด"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 3.5h4.5v4.5H3.5zM10 3.5h4.5v4.5H10zM3.5 10h4.5v4.5H3.5zM10 10h4.5v4.5H10z"/></svg></button>
+          <button type="button" class="icon" data-view="list" aria-label="แบบรายการ" title="แบบรายการ"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5h11M3.5 9h11M3.5 13h11"/></svg></button>
+        </div>
+      </div>
     </header>
     <p class="lead">เลือกสินค้าและจำนวน แล้วกด “ถัดไป” เพื่อกรอกข้อมูลผู้ซื้อ</p>
     <div class="search">
@@ -463,6 +503,6 @@
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script src="app.js?v=1848ff98"></script>
+<script src="app.js?v=6997560e"></script>
 </body>
 </html>
