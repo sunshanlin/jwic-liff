@@ -184,6 +184,7 @@
     if (!el) return;
     el.style.width = pct + '%';
     el.setAttribute('aria-valuenow', pct);
+    $('barPct').textContent = pct + '%';
   }
 
   function toast(message, long) {
@@ -290,12 +291,16 @@
     drawDocket();
     syncBuyer();
     progress(100);
-    $('loading').hidden = true;
-    $('shop').hidden = false;
-    if (resumed) {
-      next();
-      toast('ข้อมูลที่กรอกไว้ยังอยู่ กด “ส่งคำขอราคา” อีกครั้ง', true);
-    }
+    // A beat so 100% actually paints before the switch - matches the bar's own CSS transition
+    // (index.html), so the number the buyer saw counting up doesn't jump straight past it.
+    setTimeout(function () {
+      $('loading').hidden = true;
+      $('shop').hidden = false;
+      if (resumed) {
+        next();
+        toast('ข้อมูลที่กรอกไว้ยังอยู่ กด “ส่งคำขอราคา” อีกครั้ง', true);
+      }
+    }, 300);
   }
 
   function show(screen) {
