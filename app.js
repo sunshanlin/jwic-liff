@@ -109,6 +109,8 @@
   var IMG = params.get('img') || '';
   var SAVED = 'jwic-quote-request:' + LIFF_ID;
   var RELOGIN = 'jwic-quote-relogin:' + LIFF_ID;
+  // v1: bump when the liffInit answer changes shape, so a new page never draws an old page's leftovers.
+  var CATALOGUE = 'jwic-quote-catalogue-v1:' + LIFF_ID;
   // Where an item with no category is filed - the same word the Form's catalogue uses.
   var OTHER = 'อื่นๆ';
   var data = null;
@@ -124,6 +126,8 @@
   var grouped = true;
   var shopScroll = 0;
   var sent = false;
+  // The endpoint has answered (settle). Until then the shop may be a remembered Catalogue, with no ID token behind it.
+  var live = false;
   // The category a chip narrowed the list to; blank is ทั้งหมด.
   var picked = '';
   var typing = 0;
@@ -173,6 +177,8 @@
   }
 
   function fail(message) {
+    // A remembered Catalogue may already be up (start) when the endpoint refuses.
+    show('');
     $('loading').hidden = true;
     $('fatalText').textContent = message;
     $('fatal').hidden = false;
@@ -197,23 +203,87 @@
 
   function start() {
     if (!LIFF_ID || !API) return fail('ลิงก์นี้ตั้งค่าไม่ครบ กรุณาติดต่อร้านค้า');
-    progress(10);
+    preconnect();
+    // The Catalogue this phone was last shown goes up at once, while LINE and the endpoint are still
+    // answering, and what they answer takes over (settle). Only a first visit waits on the bar.
+    var early = recall();
+    if (early) {
+      data = early;
+      render();
+      enter();
+    } else {
+      progress(10);
+    }
     liff.init({ liffId: LIFF_ID })
       .then(function () {
         if (!liff.isLoggedIn()) {
           liff.login({ redirectUri: location.href });
           return null;
         }
-        progress(45);
+        if (!early) progress(45);
         return call('liffInit', { idToken: liff.getIDToken() }).then(function (res) {
           if (res.code === 'auth' && onExpired()) return;
           if (res.error) return fail(errorText(res));
+          keep(res);
+          if (early) {
+            if (settle(res)) resume();
+            return;
+          }
           progress(85);
           data = res;
           render();
+          var resumed = settle(res);
+          progress(100);
+          // A beat so 100% actually paints before the switch - matches the bar's own CSS transition
+          // (index.html). The only artificial delay on the screen, and only a first visit pays it.
+          setTimeout(function () {
+            enter();
+            if (resumed) resume();
+          }, 150);
         });
       })
       .catch(function (err) { fail('เปิดหน้าไม่สำเร็จ กรุณาลองใหม่ (' + ((err && err.message) || err) + ')'); });
+  }
+
+  /** Opens the connection to the endpoint while liff.init() runs, so the handshake is done by the time the ID token is. */
+  function preconnect() {
+    var origins;
+    try {
+      origins = [new URL(API, location.href).origin];
+    } catch (err) {
+      return;
+    }
+    // Apps Script answers every call with a redirect to a second host.
+    if (origins[0] === 'https://script.google.com') origins.push('https://script.googleusercontent.com');
+    origins.forEach(function (origin) {
+      if (origin === location.origin) return;
+      var link = document.createElement('link');
+      link.rel = 'preconnect';
+      link.href = origin;
+      // fetch() sends no credentials cross-origin, and only a crossorigin preconnect is a connection it reuses.
+      link.crossOrigin = 'anonymous';
+      document.head.appendChild(link);
+    });
+  }
+
+  /** The Catalogue this phone was last shown, or null. The caller's LINE Binding is never kept on the phone. */
+  function recall() {
+    try {
+      var kept = JSON.parse(localStorage.getItem(CATALOGUE) || 'null');
+      return kept && Array.isArray(kept.items) && Array.isArray(kept.provinces) ? kept : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function keep(res) {
+    try {
+      localStorage.setItem(CATALOGUE, JSON.stringify({
+        items: res.items, provinces: res.provinces, lineLimit: res.lineLimit, notice: res.notice
+      }));
+    } catch (err) {
+      // Storage blocked or full: the next visit waits on the endpoint, like a first one.
+    }
   }
 
   /**
@@ -264,45 +334,73 @@
     return state.basket.length > 0;
   }
 
+  /** Draws the shop from data and wires it up. Once per page, whichever answer data came from. */
   function render() {
-    data.items.forEach(function (it) { byNo[it.no] = it; });
-    $('notice').textContent = data.notice;
     data.provinces.forEach(function (p) {
       var o = document.createElement('option');
       o.value = p;
       o.textContent = p;
       $('city').append(o);
     });
-    if (data.binding) {
-      state.useBinding = true;
-      var b = data.binding;
-      $('boundName').textContent = (b.buyerName || 'เลขประจำตัวผู้เสียภาษี ' + b.taxIdMasked) +
-        (b.branchNo ? ' สาขา ' + b.branchNo : '');
-    }
+    bindShop();
+    bindForm();
+    drawCatalogue();
+    syncBuyer();
+  }
+
+  /** Everything the shop draws from data.items - again when the endpoint's Catalogue is not the one remembered. */
+  function drawCatalogue() {
+    byNo = {};
+    data.items.forEach(function (it) { byNo[it.no] = it; });
+    // An item taken off the Catalogue since it went in the basket does not stay there.
+    state.basket = state.basket.filter(function (l) { return byNo[l.no]; });
+    $('notice').textContent = data.notice;
     $('list').classList.toggle('thumbs', !!IMG);
     // The text column and the wider shop only when some item has Marketing Text to put in them.
     var descs = data.items.some(function (it) { return !!it.marketingText; });
     $('list').classList.toggle('descs', descs);
     $('shop').classList.toggle('descs', descs);
-    bindShop();
-    bindForm();
-    var resumed = restore();
     renderList();
     drawDocket();
+  }
+
+  /**
+   * The endpoint's answer: a newer Catalogue if it differs, the caller's LINE Binding, and a request
+   * saved before a login. Returns true when that request was put back.
+   */
+  function settle(res) {
+    // ponytail: a changed Catalogue (the hourly stock refresh flips In stock) rebuilds every row a
+    // second or two after the remembered one went up, taking the focus out of a quantity being typed.
+    // Patch the rows in place if that shows up in practice.
+    var changed = JSON.stringify(res.items) !== JSON.stringify(data.items);
+    data = res;
+    live = true;
+    if (changed) drawCatalogue();
+    // Not once the buyer screen is open: the questions being answered do not vanish from under the customer.
+    if (res.binding && $('form').hidden) {
+      state.useBinding = true;
+      var b = res.binding;
+      $('boundName').textContent = (b.buyerName || 'เลขประจำตัวผู้เสียภาษี ' + b.taxIdMasked) +
+        (b.branchNo ? ' สาขา ' + b.branchNo : '');
+    }
+    var resumed = restore();
+    if (resumed) {
+      renderList();
+      drawDocket();
+    }
     syncBuyer();
-    progress(100);
-    // A beat so 100% actually paints before the switch - matches the bar's own CSS transition
-    // (index.html), so the number the buyer saw counting up doesn't jump straight past it. This is
-    // the only artificial delay in the whole screen; the rest of "loading" is liff.init() and the
-    // API round-trip, which this timer has no control over.
-    setTimeout(function () {
-      $('loading').hidden = true;
-      $('shop').hidden = false;
-      if (resumed) {
-        next();
-        toast('ข้อมูลที่กรอกไว้ยังอยู่ กด “ส่งคำขอราคา” อีกครั้ง', true);
-      }
-    }, 150);
+    return resumed;
+  }
+
+  /** Swaps the loading card for the shop. */
+  function enter() {
+    $('loading').hidden = true;
+    $('shop').hidden = false;
+  }
+
+  function resume() {
+    next();
+    toast('ข้อมูลที่กรอกไว้ยังอยู่ กด “ส่งคำขอราคา” อีกครั้ง', true);
   }
 
   function show(screen) {
@@ -353,11 +451,11 @@
       SVG + '<path d="' + GLYPH[kind] + '"/></svg></button>';
   }
 
-  /** The action cell: a lone + until the line is in the basket, the full set once it is. */
+  /** The action cell: a lone cart until the line is in the basket (at 1), then the full set with its quantity box. */
   function controls(code, qty) {
+    if (qty === null) return ctrl('add', code, false);
     var box = '<input class="qty" type="number" min="1" step="any" inputmode="decimal" placeholder="จำนวน" ' +
-      'aria-label="จำนวน ' + esc(code) + '" value="' + (qty === null ? '' : esc(String(qty))) + '">';
-    if (qty === null) return box + ctrl('add', code, false);
+      'aria-label="จำนวน ' + esc(code) + '" value="' + esc(String(qty)) + '">';
     return ctrl('dec', code, qty <= 1) + box + ctrl('inc', code, false) + ctrl('del', code, false);
   }
 
@@ -424,8 +522,7 @@
     return null;
   }
 
-  // Repaints ONE row. Rebuilding the list would throw away every quantity typed into the other rows
-  // but not yet added, and take the focus with it.
+  // Repaints ONE row. Rebuilding the list would take the focus out of a quantity being typed in another row.
   function paint(code) {
     var li = rowOf(code);
     if (!li) return;
@@ -434,11 +531,10 @@
     li.classList.toggle('picked', !!line);
   }
 
-  function addLine(code, li) {
+  function addLine(code) {
     if (state.basket.length >= data.lineLimit) return toast('เลือกได้สูงสุด ' + data.lineLimit + ' รายการ');
-    var typed = parseFloat(li.querySelector('.qty').value);
     var it = byNo[code];
-    state.basket.push({ no: it.no, name: it.name, uom: it.uom, qty: typed > 0 ? typed : 1 });
+    state.basket.push({ no: it.no, name: it.name, uom: it.uom, qty: 1 });
     paint(code);
     drawDocket();
   }
@@ -541,9 +637,9 @@
       var act = b.getAttribute('data-act');
       if (act === 'del') return removeLine(code);
       if (act === 'dec') return stepLine(code, -1);
-      // + puts a line in the basket, and is its increment once it is there - "one more" both times.
+      // The cart puts a line in the basket at 1; + is its increment once it is there.
       if (lineOf(code)) return stepLine(code, 1);
-      addLine(code, li);
+      addLine(code);
     });
     // A quantity typed into a row already in the basket counts as you type. Not repainted: that
     // would pull the focus out of the box being typed in.
@@ -658,6 +754,8 @@
   }
 
   function send() {
+    // A remembered Catalogue lets a customer get this far before LINE has handed over an ID token.
+    if (!live) return toast('กำลังเชื่อมต่อ LINE กรุณารอสักครู่');
     var errors = validate(state, data.lineLimit, data.provinces);
     showErrors(errors);
     var first = Object.keys(errors)[0];
